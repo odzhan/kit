@@ -1,0 +1,10 @@
+README.h
+tests
+*.bin
+*.exe
+*.dll
+*.efi
+*.o
+*.swp
+kmexploit
+.git
