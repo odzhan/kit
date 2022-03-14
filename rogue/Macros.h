@@ -10,6 +10,9 @@
 
 #pragma once
 
+/* Finds a function / variable / string address via its relative offset to GetIp() */
+#define G_PTR( x )	( ULONG_PTR )( GetIp( ) - ( ( ULONG_PTR ) & GetIp - ( ULONG_PTR ) x ) )
+
 /* Cast as a function / variable / string in a specific region of memory */
 #define D_SEC( x )	__attribute__(( section( ".text$" #x ) ))
 
