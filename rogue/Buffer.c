@@ -267,3 +267,51 @@ D_SEC( B ) BOOL BufferAddRawB( _In_ PBUFFER Buffer, _In_ PVOID Value, _In_ ULONG
 	/* Did our allocation succeed? */
 	return Ret;
 };
+
+/*!
+ *
+ * Purpose:
+ *
+ * Extends a buffer to a specific size.
+ *
+!*/
+D_SEC( B ) BOOL BufferExtend( _In_ PBUFFER Buffer, _In_ ULONG Length )
+{
+	API	Api;
+	BUFFER	Buf;
+
+	BOOL	Ret = FALSE;
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Buf, sizeof( Buf ) );
+
+	Api.RtlReAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
+	Api.RtlAllocateHeap   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
+	Api.RtlFreeHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+
+	/* Create a buffer */
+	if ( Buffer->Buffer != NULL ) {
+		Buf.Buffer = Api.RtlReAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Buffer->Buffer, Buffer->Length + Length );
+	} else {
+		Buf.Buffer = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Buffer->Length + Length );
+	};
+
+	if ( Buf.Buffer != NULL ) {
+		/* Set new pointer */
+		Buffer->Buffer = C_PTR( Buf.Buffer );
+
+		/* Set new length */
+		Buffer->Length = Buffer->Length + Length;
+
+		/* Status */
+		Ret = TRUE;
+	};
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Buf, sizeof( Buf ) );
+
+	/* Did our allocation succeed? */
+	return Ret;
+};

