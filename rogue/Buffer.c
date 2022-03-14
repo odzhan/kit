@@ -315,3 +315,10 @@ D_SEC( B ) BOOL BufferExtend( _In_ PBUFFER Buffer, _In_ ULONG Length )
 	/* Did our allocation succeed? */
 	return Ret;
 };
+
+//
+// TODO:
+//
+// printf API
+//
+//

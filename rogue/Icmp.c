@@ -228,6 +228,7 @@ D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 
 													if ( ( Idx + 1 ) != Seq.ChunkTotal && Seq.Id != Sqp->Id ) {
 														break;
 													};
+													/* Copy Response Over */
 													/* Status */
 													Ret = TRUE;
 												} else {
@@ -279,7 +280,10 @@ D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 
 				};
 				if ( Icf != INVALID_HANDLE_VALUE ) {
 					Api.IcmpCloseHandle( Icf );
+					Icf = INVALID_HANDLE_VALUE;
 				};
+
+				/* Check response to ensure we have data? or need more? */
 			};
 			/* Dereference */
 			Api.LdrUnloadDll( Icp );
