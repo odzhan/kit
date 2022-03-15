@@ -71,3 +71,12 @@ D_SEC( B ) BOOL BufferAddRawB( _In_ PBUFFER Buffer, _In_ PVOID Value, _In_ ULONG
  *
 !*/
 D_SEC( B ) BOOL BufferExtend( _In_ PBUFFER Buffer, _In_ ULONG Length );
+
+/*!
+ *
+ * Purpose:
+ *
+ * Appends a formated string to a buffer.
+ *
+!*/
+D_SEC( B ) BOOL BufferPrintf( _In_ PBUFFER Buffer, _In_ PCHAR Format, ... );

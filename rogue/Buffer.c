@@ -15,12 +15,14 @@ typedef struct
 	D_API( RtlReAllocateHeap );
 	D_API( RtlAllocateHeap );
 	D_API( RtlFreeHeap );
+	D_API( _vsnprintf );
 } API ;
 
 /* API Hashes */
 #define H_API_RTLREALLOCATEHEAP		0xaf740371 /* RtlReAllocateHeap */
 #define H_API_RTLALLOCATEHEAP		0x3be94c5a /* RtlAllocateHeap */
 #define H_API_RTLFREEHEAP		0x73a9e4d7 /* RtlFreeHeap */
+#define H_API_VSNPRINTF			0xa59022ce /* _vsnprintf */
 
 /* LIB Hashes */
 #define H_LIB_NTDLL			0x1edab0ed /* ntdll.dll */
@@ -45,6 +47,7 @@ D_SEC( B ) PBUFFER BufferCreate( VOID )
 	Api.RtlReAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
 	Api.RtlAllocateHeap   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api._vsnprintf        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_VSNPRINTF );
 
 	/* Create buffer Object */
 	if ( ( Buf = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( BUFFER ) ) ) != NULL ) {
@@ -82,6 +85,7 @@ D_SEC( B ) BOOL BufferAddInt4( _In_ PBUFFER Buffer, _In_ UINT32 Value )
 	Api.RtlReAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
 	Api.RtlAllocateHeap   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api._vsnprintf        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_VSNPRINTF );
 
 	/* Create a buffer to hold our integer */
 	if ( Buffer->Buffer != NULL ) {
@@ -133,6 +137,7 @@ D_SEC( B ) BOOL BufferAddInt2( _In_ PBUFFER Buffer, _In_ UINT16 Value )
 	Api.RtlReAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
 	Api.RtlAllocateHeap   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api._vsnprintf        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_VSNPRINTF );
 
 	/* Create a buffer to hold our integer */
 	if ( Buffer->Buffer != NULL ) {
@@ -185,6 +190,7 @@ D_SEC( B ) BOOL BufferAddInt1( _In_ PBUFFER Buffer, _In_ UINT8 Value )
 	Api.RtlReAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
 	Api.RtlAllocateHeap   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api._vsnprintf        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_VSNPRINTF );
 
 	/* Create a buffer to hold our integer */
 	if ( Buffer->Buffer != NULL ) {
@@ -237,6 +243,7 @@ D_SEC( B ) BOOL BufferAddRawB( _In_ PBUFFER Buffer, _In_ PVOID Value, _In_ ULONG
 	Api.RtlReAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
 	Api.RtlAllocateHeap   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api._vsnprintf        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_VSNPRINTF );
 
 	/* Create a bufffer to hold the input */
 	if ( Buffer->Buffer != NULL ) {
@@ -289,6 +296,7 @@ D_SEC( B ) BOOL BufferExtend( _In_ PBUFFER Buffer, _In_ ULONG Length )
 	Api.RtlReAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
 	Api.RtlAllocateHeap   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api._vsnprintf        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_VSNPRINTF );
 
 	/* Create a buffer */
 	if ( Buffer->Buffer != NULL ) {
@@ -316,9 +324,65 @@ D_SEC( B ) BOOL BufferExtend( _In_ PBUFFER Buffer, _In_ ULONG Length )
 	return Ret;
 };
 
-//
-// TODO:
-//
-// printf API
-//
-//
+/*!
+ *
+ * Purpose:
+ *
+ * Appends a formated string to a buffer.
+ *
+!*/
+D_SEC( B ) BOOL BufferPrintf( _In_ PBUFFER Buffer, _In_ PCHAR Format, ... )
+{
+	API	Api;
+	BUFFER	Buf;
+	va_list	Lst;
+
+	INT	Len = 0;
+	BOOL	Ret = FALSE;
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Buf, sizeof( Buf ) );
+	RtlSecureZeroMemory( &Lst, sizeof( Lst ) );
+
+	Api.RtlReAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
+	Api.RtlAllocateHeap   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
+	Api.RtlFreeHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api._vsnprintf        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_VSNPRINTF );
+
+	/* Get length of buffer */
+	va_start( Lst, Format );
+	Len = Api._vsnprintf( NULL, 0, Format, Lst );
+	va_end( Lst );
+
+	/* Create a buffer */
+	if ( Buffer->Buffer != NULL ) {
+		Buf.Buffer = Api.RtlReAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Buffer->Buffer, Buffer->Length + Len );
+	} else {
+		Buf.Buffer = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Buffer->Length + Len );
+	};
+
+	if ( Buf.Buffer != NULL ) {
+		/* Set new pointer */
+		Buffer->Buffer = C_PTR( Buf.Buffer );
+
+		/* Copy over our buffer */
+		va_start( Lst, Format );
+		Len = Api._vsnprintf( C_PTR( U_PTR( Buffer->Buffer ) + Buffer->Length ), Len, Format, Lst );
+		va_end( Lst );
+
+		/* Set new length */
+		Buffer->Length = Buffer->Length + Len;
+
+		/* Status */
+		Ret = TRUE;
+	};
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Buf, sizeof( Buf ) );
+	RtlSecureZeroMemory( &Lst, sizeof( Lst ) );
+
+	/* Did our allocation succeed? */
+	return Ret;
+};

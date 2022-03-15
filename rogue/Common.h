@@ -14,10 +14,13 @@
 #include <ntstatus.h>
 #include <ipexport.h>
 #include <icmpapi.h>
+#include <stdint.h>
 #include "Native.h"
 #include "Macros.h"
 #include "Buffer.h"
+#include "Random.h"
 #include "Labels.h"
+#include "Icmp.h"
 #include "Hash.h"
 #include "Peb.h"
 #include "Pe.h"
