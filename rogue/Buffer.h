@@ -61,7 +61,7 @@ D_SEC( B ) BOOL BufferAddInt1( _In_ PBUFFER Buffer, _In_ UINT8 Value );
  * Insert a raw buffer type.
  *
 !*/
-D_SEC( B ) BOOL BufferAddRawB( _In_ PBUFFER Buffer, _In_ PVOID Value, _In_ ULONG Length );
+D_SEC( B ) BOOL BufferAddRaw( _In_ PBUFFER Buffer, _In_ PVOID Value, _In_ ULONG Length );
 
 /*!
  *
