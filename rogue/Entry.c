@@ -38,7 +38,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 	if ( ( Inb = BufferCreate() ) != NULL ) {
 		if ( ( Onb = BufferCreate() ) ) {
-			BufferPrintf( Onb, C_PTR( G_PTR( "%s" ) ), "AAAAABBBBB" );
+			BufferPrintf( Onb, C_PTR( G_PTR( "%s" ) ), C_PTR( G_PTR( "AAAAABBBBB" ) ) );
 			BufferAddRaw( Onb, &Tsk, sizeof( Tsk ) );
 
 			if ( TaskHello( Inb->Buffer, Inb->Length, Onb ) ) {
