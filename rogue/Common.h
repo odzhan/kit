@@ -13,6 +13,7 @@
 #include <windows.h>
 #include <ntstatus.h>
 #include <ipexport.h>
+#include <iphlpapi.h>
 #include <icmpapi.h>
 #include <stdint.h>
 #include "Native.h"
@@ -24,4 +25,7 @@
 #include "Icmp.h"
 #include "Hash.h"
 #include "Peb.h"
+#include "Os.h"
 #include "Pe.h"
+
+#include "cmd/TaskHello.h"

