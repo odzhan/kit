@@ -19,14 +19,54 @@ RtlRandomEx(
 
 typedef struct
 {
+	D_API( RtlAllocateHeap );
 	D_API( RtlRandomEx );
 } API ;
 
 /* API Hashes */
+#define H_API_RTLALLOCATEHEAP	0x3be94c5a /* RtlAllocateHeap */
 #define H_API_RTLRANDOMEX	0x7f1224f5 /* RtlRandomEx */
 
 /* LIB Hashes */
 #define H_LIB_NTDLL		0x1edab0ed /* ntdll.dll */
+
+/*!
+ *
+ * Purpose:
+ *
+ * Returns a random string of the specified 
+ * length.
+ *
+!*/
+D_SEC( B ) VOID RandomString( _In_ PCHAR Buffer, _In_ UINT32 Length )
+{
+	API	Api;
+
+	PCHAR	Alp = C_PTR( G_PTR( "ABCDEFGHIJKLMNOPQRSTUVWXYZ" ) );
+	UINT32	Val = 0;
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+
+	/* Init API */
+	Api.RtlAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
+	Api.RtlRandomEx     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLRANDOMEX );
+
+	/* Create buffer to hold the random string */
+	for ( INT Idx = 0 ; Idx < Length ; ++Idx ) {
+		/* Generate random index */
+		Val = NtGetTickCount();
+		Val = Api.RtlRandomEx( &Val );
+		Val = Api.RtlRandomEx( &Val );
+		Val = Val % 26;
+
+		/* Set character */
+		Buffer[ Idx ] = Alp[ Val ];
+	};
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+};
 
 /*!
  *
@@ -46,8 +86,11 @@ D_SEC( B ) UINT16 RandomInt16( VOID )
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 
+	/* Init API */
+	Api.RtlAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP ); 
+	Api.RtlRandomEx     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLRANDOMEX );
+
 	/* Set the current random value */
-	Api.RtlRandomEx = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLRANDOMEX );
 	Val = NtGetTickCount();
 	Val = Api.RtlRandomEx( &Val );
 	Val = Api.RtlRandomEx( &Val );

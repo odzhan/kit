@@ -16,6 +16,7 @@
 #include <iphlpapi.h>
 #include <icmpapi.h>
 #include <stdint.h>
+#include "Context.h"
 #include "Native.h"
 #include "Macros.h"
 #include "Buffer.h"
