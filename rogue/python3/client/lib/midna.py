@@ -41,6 +41,16 @@ class Midna(object):
         targets = json.loads(r.text)
         return targets["results"]
 
+    def get_task( self, idstr ):
+        with httpx.Client() as client:
+            headers = {
+                    'Authorization': f'Bearer {self.token}',
+                    'Content-Type': 'application-json'
+            }
+            r = client.get( self.url + self.tasks_endpoint + idstr, headers=headers, timeout = None );
+            tasks = json.loads(r.text);
+            return tasks['results'];
+
     def get_tasks(self):
         with httpx.Client() as client:
             headers = { 

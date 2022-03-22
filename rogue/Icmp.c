@@ -232,7 +232,6 @@ D_SEC( B ) BOOL IcmpSendRecv( _In_ PCHAR HostName, _In_ PVOID InBuffer, _In_ UIN
 															if ( OuBuffer != NULL && OuLength != NULL && OuSuccess != NULL ) {
 																/*  Read the response!: Note, chunk if needed, go to next field */
 																if ( ( *OuBuffer = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Rep->DataSize - sizeof( HDR_PKT ) - sizeof( SEQ_PKT ) ) ) ) {
-					
 																	/* Set response chunk(s) */
 																	Max = Sqp->ChunkTotal;
 	
