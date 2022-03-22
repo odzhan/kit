@@ -27,8 +27,9 @@ if __name__ in '__main__':
     opts.add_argument( '-i', '--interact', help = 'ID of the agent to interact with.', required = False, default = '', type = str );
     opts.add_argument( '-b', '--block', help = 'Block until the task has been executed.', action = 'store_true', default = False );
     cmds = opts.add_subparsers( help = 'client commands.', dest = 'subcommand', required = True );
-    cmds.add_parser( 'hello', help = 'Tasks the agent to send back a hello packet.' );
+    cmds.add_parser( 'hello', help = 'Tasks the agent to say hello.' );
     cmds.add_parser( 'list', help = 'Prints a list of agents that are connected.' );
+    cmds.add_parser( 'exit', help = 'Tasks the agent to exit.' );
     args = opts.parse_args();
 
     ##
@@ -61,7 +62,7 @@ if __name__ in '__main__':
                 logging.success( 'GUID: {} ID: {} Name: {} Arch: {}'.format( Client['guid'], Client['implant_id'], Client['machine_name'], Client['architecture'] ) );
 
     ##
-    ## "hello"
+    ## Everything else
     ##
     else:
         ##
@@ -95,6 +96,19 @@ if __name__ in '__main__':
                         ##
                         Tsk = Web.new_task( {
                             'code': tasking.COMMAND_HELLO,
+                            'target_id': Client['id'],
+                            'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
+                        } );
+
+                    ##
+                    ## Insert Task: Exit
+                    ##
+                    if args.subcommand == 'exit':
+                        ##
+                        ## ExitFree has no buffer
+                        ##
+                        Tsk = Web.new_task( {
+                            'code': tasking.COMMAND_EXITFREE,
                             'target_id': Client['id'],
                             'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
                         } );

