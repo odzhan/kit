@@ -121,7 +121,7 @@ if __name__ in '__main__':
                     ##
                     ## Abort
                     ##
-                    if args.block != False:
+                    if args.block != False and args.subcommand != 'exit':
                         while True:
                             try:
                                 ##
@@ -137,6 +137,27 @@ if __name__ in '__main__':
                                     ## Success!
                                     ##
                                     logging.success( 'Task was executed sucessfully. Task returned {}'.format( Obj['return_code'] ) );
+
+                                    if args.subcommand == 'hello':
+                                        ##
+                                        ## Remove
+                                        ##
+                                        Str = base64.b64decode( Obj['return_data'] )
+                                        Dsk = Str[ 10 : ].decode().split( '\t' )[ 0 ]
+                                        Ips = Str[ 10 : ].decode().split( '\t' )[ 1 ]
+
+                                        ##
+                                        ## Destktop name
+                                        ##
+                                        logging.print( 'NETBIOS: {}'.format( Dsk ) );
+
+                                        for Info in Ips.split(';'):
+                                            ##
+                                            ## Print the interface and IPv4
+                                            ##
+                                            if Info:
+                                                logging.print( '{}'.format( Info ) );
+
                                     break;
                                 else:
                                     ##

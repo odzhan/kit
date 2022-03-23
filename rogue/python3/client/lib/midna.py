@@ -80,6 +80,14 @@ class Midna(object):
             r = client.put(self.url + self.tasks_endpoint, headers=headers, json=task, timeout = None);
         return True
 
+    def remove_target( self, idstr ):
+        with httpx.Client() as client:
+            headers = {
+                'Authorization': f'Bearer {self.token}',
+                'Content-Type': 'applicaton/json'
+            }
+            r = client.delete( self.url + self.targets_endpoint + idstr, headers=headers, timeout=None);
+        return True
 
     def new_target(self, target):
         with httpx.Client() as client:
