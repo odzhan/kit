@@ -90,13 +90,16 @@ if __name__ in '__main__':
                     ##
                     ## Create the task.
                     ##
-                    logging.success( 'Dispatching a task to the webserver' );
 
                     if args.subcommand == 'logs':
+                        logging.success( 'Listening into the log queue.' );
                         ##
                         ## Print Log info!
                         ##
                         asyncio.run( websocket.ListenForLogs( Client ) ); raise SystemExit
+
+
+                    logging.success( 'Attempting to dispatch task to the queue.' );
 
                     ##
                     ## Insert Task: Hello

