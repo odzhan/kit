@@ -96,7 +96,7 @@ if __name__ in '__main__':
                         ##
                         ## Print Log info!
                         ##
-                        asyncio.run( websocket.ListenForLogs( Client ) );
+                        asyncio.run( websocket.ListenForLogs( Client ) ); raise SystemExit
 
                     ##
                     ## Insert Task: Hello

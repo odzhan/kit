@@ -131,8 +131,6 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 													Ret->ReturnCode = 0;
 													Ret->ErrorValue = 0;
 
-													RoguePrintf( Ctx, C_PTR( G_PTR( "Leaving rogue :(" ) ) );
-
 													/* Abort */
 													break;
 												case ShellcodeTask:

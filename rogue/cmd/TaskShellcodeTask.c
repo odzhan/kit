@@ -31,6 +31,7 @@ typedef struct
 	D_API( BufferExtend );
 	D_API( BufferAddRaw );
 	D_API( BufferCreate );
+	D_API( RoguePrintf );
 } ROGUE_API ;
 
 /*!
@@ -55,6 +56,7 @@ D_SEC( B ) DWORD TaskShellcodeTask( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, 
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Rpi, sizeof( Rpi ) );
 
+	/* Set API pointers */
 	Api.NtAllocateVirtualMemory = NULL;
 	Api.NtFreeVirtualMemory     = NULL;
 
