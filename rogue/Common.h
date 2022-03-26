@@ -26,11 +26,10 @@
 #include "Icmp.h"
 #include "Hash.h"
 #include "Task.h"
-#include "Exit.h"
 #include "Peb.h"
 #include "Os.h"
 #include "Pe.h"
 #include "Io.h"
 
-#include "cmd/TaskShellcodeTask.h"
+#include "cmd/TaskInlineExecute.h"
 #include "cmd/TaskHello.h"

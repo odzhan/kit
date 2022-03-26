@@ -19,8 +19,6 @@ from lib import logging
 from lib import tasking
 from lib import websocket
 
-Logs = []
-
 ##
 ## Create argument
 ##
@@ -33,7 +31,7 @@ if __name__ in '__main__':
     cmds = opts.add_subparsers( help = 'client commands.', dest = 'subcommand', required = True );
     cmds.add_parser( 'hello', help = 'Tasks the agent to say hello.' );
     cmds.add_parser( 'list', help = 'Prints a list of agents that are connected.' );
-    cmds.add_parser( 'exit', help = 'Tasks the agent to exit.' );
+    cmds.add_parser( 'exit', help = 'Tasks the agent to exit. Cannot be blocked.' );
     cmds.add_parser( 'logs', help = 'Tasks the client to read the log queue.' );
     args = opts.parse_args();
 
@@ -88,9 +86,8 @@ if __name__ in '__main__':
                 ##
                 if Client['implant_id'] == args.interact:
                     ##
-                    ## Create the task.
+                    ## Insert Task: Logs
                     ##
-
                     if args.subcommand == 'logs':
                         logging.success( 'Listening into the log queue.' );
                         ##
@@ -98,22 +95,11 @@ if __name__ in '__main__':
                         ##
                         asyncio.run( websocket.ListenForLogs( Client ) ); raise SystemExit
 
-
-                    logging.success( 'Attempting to dispatch task to the queue.' );
-
                     ##
                     ## Insert Task: Hello
                     ##
                     if args.subcommand == 'hello':
-                        ##
-                        ## Hello has no buffer
-                        ##
-                        Tsk = Web.new_task( {
-                            'code': tasking.COMMAND_HELLO,
-                            'callback': 0,
-                            'target_id': Client['id'],
-                            'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
-                        } );
+                        tasking.Task_Hello( Web, Client, args.block, args );
 
                     ##
                     ## Insert Task: Exit
@@ -122,68 +108,11 @@ if __name__ in '__main__':
                         ##
                         ## ExitFree has no buffer
                         ##
-                        Tsk = Web.new_task( {
-                            'code': tasking.COMMAND_EXITFREE,
-                            'callback': 0,
-                            'target_id': Client['id'],
-                            'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
-                        } );
-
-                    ##
-                    ## Print Info
-                    ##
-                    logging.success( 'Task has been added to the queue.' );
+                        tasking.Task_ExitFree( Web, Client, args.block, args );
 
                     ##
                     ## Abort
-                    ##
-                    if args.block != False and args.subcommand != 'exit':
-                        while True:
-                            try:
-                                ##
-                                ## Read the current task
-                                ##
-                                Obj = Web.get_task( str( Tsk['id'] ) )[0];
-
-                                ##
-                                ##
-                                ## Did it succeeed?
-                                if ( Obj['status'] == 3 ):
-                                    ##
-                                    ## Success!
-                                    ##
-                                    logging.success( 'Task was executed sucessfully. Task returned {}'.format( Obj['return_code'] ) );
-
-                                    if args.subcommand == 'hello':
-                                        ##
-                                        ## Remove
-                                        ##
-                                        Str = base64.b64decode( Obj['return_data'] )
-                                        Dsk = Str[ 10 : ].decode().split( '\t' )[ 0 ]
-                                        Ips = Str[ 10 : ].decode().split( '\t' )[ 1 ]
-
-                                        ##
-                                        ## Destktop name
-                                        ##
-                                        logging.print( 'NETBIOS: {}'.format( Dsk ) );
-
-                                        for Info in Ips.split(';'):
-                                            ##
-                                            ## Print the interface and IPv4
-                                            ##
-                                            if Info:
-                                                logging.print( '{}'.format( Info ) );
-
-                                    break;
-                                else:
-                                    ##
-                                    ## Nothing yet.
-                                    ##
-                                    time.sleep( 5 );
-                            except Exception as Error:
-                                logging.error( 'Error {}'.format( Error ) );
-                                raise SystemExit;
-
+                    ## 
                     break;
         else:
             logging.error( 'please provide an id to interact with.' );

@@ -12,6 +12,13 @@
 
 typedef struct
 {
+	/* Static */
 	UCHAR	Id[ 10 ];
-	BOOL Established;
+
+	/* Settings */
+	UINT32	SleepTime;
+	UINT32	Jitter;
+
+	/* On / Off */
+	BOOLEAN	Established;;
 } ROGUE_CTX, *PROGUE_CTX;

