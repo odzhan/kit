@@ -14,8 +14,9 @@
 #include <ntstatus.h>
 #include "Native.h"
 #include "Macros.h"
-#include "Rogue.h"
+#include "Labels.h"
 #include "Buffer.h"
+#include "Rogue.h"
 #include "Hash.h"
 #include "Peb.h"
 #include "Pe.h"

