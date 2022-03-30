@@ -39,13 +39,13 @@ typedef struct
  * Buffer and Length as it is not needed.
  *
 !*/
-D_SEC( B ) DWORD TaskHello( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER Output )
+D_SEC( B ) DWORD TaskHello( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER Output )
 {
 	API			Api;
 	TASK_HELLO_BUF		Thb;
 	RTL_OSVERSIONINFOW	Ver;
 
-	DWORD			Ret = 1;
+	DWORD			Ret = ErrorAction;
 
 	PCHAR			Dsk = NULL;
 	PBUFFER			Out = NULL;
@@ -93,7 +93,7 @@ D_SEC( B ) DWORD TaskHello( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, _In_ UIN
 							};
 						};
 						/* Add output and set return value */
-						Ret = BufferAddRaw( Output, Out->Buffer, Out->Length );
+						Ret = BufferAddRaw( Output, Out->Buffer, Out->Length ) != TRUE ? ErrorAction : NoAction;
 					};
 					Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Pai );
 					Pai = NULL;

@@ -20,3 +20,11 @@
 #include "Hash.h"
 #include "Peb.h"
 #include "Pe.h"
+
+#ifndef ROGUE_RETURN_SUCCESS
+#define ROGUE_RETURN_SUCCESS 0
+#endif
+
+#ifndef ROGUE_RETURN_FAILURE
+#define ROGUE_RETURN_FAILURE 1
+#endif

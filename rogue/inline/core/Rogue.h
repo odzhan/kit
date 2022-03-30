@@ -13,6 +13,7 @@
 VOID
 RogueOutput(
 	_In_ PVOID RogueContext,
+	_In_ USHORT Uid,
 	_In_ PVOID Buffer,
 	_In_ UINT32 Length
 );
@@ -20,6 +21,7 @@ RogueOutput(
 VOID 
 RoguePrintf(
 	_In_ PVOID RogueContext,
+	_In_ USHORT Uid,
 	_In_ PCHAR Format,
 	...
 );

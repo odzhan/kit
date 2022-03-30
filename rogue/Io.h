@@ -19,7 +19,7 @@
  * logs, it will print the data out.
  *
 !*/
-D_SEC( B ) VOID RogueOutput( _In_ PROGUE_CTX Context, _In_ PCHAR Buffer, _In_ UINT32 Length );
+D_SEC( B ) VOID RogueOutput( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PCHAR Buffer, _In_ UINT32 Length );
 
 /*!
  *
@@ -30,4 +30,4 @@ D_SEC( B ) VOID RogueOutput( _In_ PROGUE_CTX Context, _In_ PCHAR Buffer, _In_ UI
  * logs, it will print the data out.
  *
 !*/
-D_SEC( B ) VOID RoguePrintf( _In_ PROGUE_CTX Context, _In_ PCHAR Format, ... );
+D_SEC( B ) VOID RoguePrintf( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PCHAR Format, ... );

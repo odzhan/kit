@@ -17,11 +17,12 @@
  * Print information about the current host.
  *
 !*/
-D_SEC( A ) DWORD RoguePrintTest( PROGUE_API Rogue, PVOID Context, PVOID Buffer, UINT32 Length, PBUFFER Output )
+D_SEC( A ) DWORD RoguePrintTest( PROGUE_API Rogue, PVOID Context, USHORT Uid, PVOID Buffer, UINT32 Length, PBUFFER Output )
 {
-	Rogue->RoguePrintf( Context, C_PTR( G_PTR( "========================" ) ) );
-	Rogue->RoguePrintf( Context, C_PTR( G_PTR( "Currently in memory @ %p" ) ), C_PTR( G_PTR( RoguePrintTest ) ) );
-	Rogue->RoguePrintf( Context, C_PTR( G_PTR( "========================" ) ) );
+	Rogue->RoguePrintf( Context, Uid, C_PTR( G_PTR( "========================" ) ) );
+	Rogue->RoguePrintf( Context, Uid, C_PTR( G_PTR( "Currently in memory @ %p" ) ), C_PTR( G_PTR( RoguePrintTest ) ) );
+	Rogue->RoguePrintf( Context, Uid, C_PTR( G_PTR( "========================" ) ) );
 
-	BufferPrintf( Output, C_PTR( G_PTR( "%s" ) ) );
+	/* Return No Error! */
+	return ROGUE_RETURN_SUCCESS;
 }

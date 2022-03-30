@@ -17,4 +17,4 @@
  * Executes a custom inline task and return its output.
  *
 !*/
-D_SEC( B ) DWORD TaskInlineExecute( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER Output );
+D_SEC( B ) DWORD TaskInlineExecute( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER Output );

@@ -18,4 +18,4 @@
  * Buffer and Length as it is not needed.
  *
 !*/
-D_SEC( B ) DWORD TaskHello( _In_ PROGUE_CTX Context, _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER Output );
+D_SEC( B ) DWORD TaskHello( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PVOID Buffer, _In_ UINT32 Length, _In_ PBUFFER Output );
