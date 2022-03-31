@@ -90,12 +90,24 @@ def Task_Hello( WebObj, ClientObj, Block, Args ):
 def Task_ExitFree( WebObj, ClientObj, Block, Args ):
     try:
         ##
+        ## Exit depending on mode.
+        ##
+        if Args.mode == 'process':
+            pkt = struct.pack( '!I', 0 );
+        if Args.mode == 'thread':
+            pkt = struct.pack( '!I', 1 );
+        if Args.mode == 'thread-free':
+            pkt = struct.pack( '!I', 2 );
+        if Args.mode == 'none':
+            pkt = struct.pack( '!I', 3 );
+
+        ##
         ## Create an ExitFree task
         ##
         Tsk = WebObj.new_task( {
             'code': COMMAND_EXITFREE,
             'target_id': ClientObj['id'],
-            'args': { 'buffer': '{}'.format( base64.b64encode( b'' ).decode() ) }
+            'args': { 'buffer': '{}'.format( base64.b64encode( pkt ).decode() ) }
         } );
 
         logging.success( 'Tasked to exit {}'.format( ClientObj['implant_id'] ) );

@@ -20,7 +20,10 @@ async def tcallback( data ):
                 ## Print Message if matches our client
                 ##
                 if data['target_id'] == gClient['id']:
-                    print( '{}'.format( base64.b64decode( data['return_data'] ).decode() ) );
+                    ##
+                    ## Print the debug information
+                    ##
+                    print( '[DEBUG] {}'.format( base64.b64decode( data['return_data'] ).decode() ) );
     except Exception as e:
         print( e )
 

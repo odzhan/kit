@@ -62,8 +62,11 @@ D_SEC( A ) DWORD ProcessListNative( PROGUE_API Rogue, PVOID Context, USHORT Uid,
 
 					/* Enumerate the process info */
 					while ( Tmp->NextEntryOffset != 0 ) {
-						/* Print out the buffer to the message */
-						BufferPrintf( Out, C_PTR( G_PTR( "%S\t%hu\t%hu\n" ) ), Tmp->ImageName.Buffer, Tmp->UniqueProcessId, Tmp->InheritedFromUniqueProcessId );
+						/* Is a valid image name buffer */
+						if ( Tmp->ImageName.Buffer != NULL ) {
+							/* Print out the buffer to the message */
+							BufferPrintf( Out, C_PTR( G_PTR( "%S\t%hu\t%hu\n" ) ), Tmp->ImageName.Buffer, Tmp->UniqueProcessId, Tmp->InheritedFromUniqueProcessId );
+						};
 
 						/* Increment to the next entry! */
 						Tmp = C_PTR( U_PTR( Tmp ) + Tmp->NextEntryOffset );

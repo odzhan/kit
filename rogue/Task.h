@@ -29,7 +29,7 @@ typedef struct __attribute__(( packed, scalar_storage_order( "big-endian" ) ))
 typedef enum 
 {
 	Hello         = 0,
-	ExitFree      = 1,
+	Exit          = 1,
 	InlineExecute = 2
 } TASK_CODE ;
 

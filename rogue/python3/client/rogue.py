@@ -36,12 +36,14 @@ if __name__ in '__main__':
     ##
     cmds.add_parser( 'hello', help = 'Tasks the agent to say hello.' );
     cmds.add_parser( 'list', help = 'Prints a list of agents that are connected.' );
-    cmds.add_parser( 'exit', help = 'Tasks the agent to exit. Cannot be blocked.' );
     cmds.add_parser( 'logs', help = 'Tasks the client to read the log queue.' );
 
     ##
     ## Commands with arguments
     ## 
+    sopt = cmds.add_parser( 'exit', help = 'Tasks the agent to exit.' );
+    sopt.add_argument( '-m', '--mode', help = 'Mode to exit with.', choices = [ "thread", "thread-free", "process", "none" ], required = True );
+
     sopt = cmds.add_parser( 'inline-execute', help = 'Tasks the client to execute an inline command' );
     sopt.add_argument( '-f', '--file', help = 'Path to a shellcode to execute.', type = argparse.FileType( 'rb+' ), required = True );
 

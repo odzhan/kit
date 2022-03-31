@@ -26,6 +26,7 @@
 #include "Icmp.h"
 #include "Hash.h"
 #include "Task.h"
+#include "Exit.h"
 #include "Peb.h"
 #include "Os.h"
 #include "Pe.h"
@@ -33,3 +34,4 @@
 
 #include "cmd/TaskInlineExecute.h"
 #include "cmd/TaskHello.h"
+#include "cmd/TaskExit.h"

