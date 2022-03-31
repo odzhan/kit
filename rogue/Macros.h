@@ -24,3 +24,12 @@
 
 /* Cast as a pointer */
 #define C_PTR( x )	( ( PVOID ) x )
+
+/* Arch Specific Macros */
+#if defined( _WIN64 )
+	/* Get the end of code: x64 */
+	#define G_END( x )	U_PTR( GetIp( ) + 11 )
+#else
+	/* Get the end of code: x86 */
+	#define G_END( x )	U_PTR( GetIp( ) + 10 )
+#endif

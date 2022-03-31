@@ -14,6 +14,10 @@
 #define ICMP_LISTENER_ADDRESS "192.168.30.130"
 #endif
 
+#ifndef ROGUE_WAIT_PERIOD
+#define ROGUE_WAIT_PERIOD 20000
+#endif
+
 #ifndef ICMP_WAIT_TIMEOUT
 #define ICMP_WAIT_TIMEOUT 5000
 #endif

