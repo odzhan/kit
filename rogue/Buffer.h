@@ -79,4 +79,13 @@ D_SEC( B ) BOOL BufferExtend( _In_ PBUFFER Buffer, _In_ ULONG Length );
  * Appends a formated string to a buffer.
  *
 !*/
-D_SEC( B ) BOOL BufferPrintf( _In_ PBUFFER Buffer, _In_ PCHAR Format, ... );
+D_SEC( B ) BOOL BufferPrintfA( _In_ PBUFFER Buffer, _In_ PCHAR Format, ... );
+
+/*!
+ *
+ * Purpose:
+ *
+ * Appens a formatted string to a buffer. Wide character
+ *
+!*/
+D_SEC( B ) BOOL BufferPrintfW( _In_ PBUFFER Buffer, _In_ PWSTR Format, ... );
