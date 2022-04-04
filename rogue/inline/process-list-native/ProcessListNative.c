@@ -32,7 +32,7 @@ typedef struct
  * Prints a list of running process's and info about them.
  *
 !*/
-D_SEC( A ) DWORD ProcessListNative( PROGUE_API Rogue, PVOID Context, USHORT Uid, PVOID Buffer, UINT32 Length, PBUFFER Output )
+D_SEC( A ) DWORD ProcessListNative( PROGUE_API Rogue, PROGUE_CTX Context, USHORT Uid, PVOID Buffer, UINT32 Length, PBUFFER Output )
 {
 	API				Api;
 

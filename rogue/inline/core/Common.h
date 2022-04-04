@@ -12,6 +12,7 @@
 
 #include <windows.h>
 #include <ntstatus.h>
+#include "Context.h"
 #include "Native.h"
 #include "Macros.h"
 #include "Labels.h"

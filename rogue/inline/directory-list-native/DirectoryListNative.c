@@ -36,7 +36,7 @@ typedef struct
  * Lists a requested directory using NT.
  *
 !*/
-D_SEC( A ) DWORD DirectoryListNative( _In_ PROGUE_API Rogue, _In_ PVOID Context, _In_ USHORT Uid, _In_ PVOID Buffer, _In_ ULONG Length, PBUFFER Output )
+D_SEC( A ) DWORD DirectoryListNative( _In_ PROGUE_API Rogue, _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PVOID Buffer, _In_ ULONG Length, PBUFFER Output )
 {
 	API		Api;
 	UNICODE_STRING	Uni;
