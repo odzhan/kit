@@ -40,13 +40,13 @@ set BEACON_RDLL_GENERATE {
 			return $null;
 		};
 	};
-	if ( [ $prf getString: ".stage.cleanup" ] eq "false" ) {
+	##if ( [ $prf getString: ".stage.cleanup" ] eq "false" ) {
 		##
 		## Opsec error!
 		##
-		warn( 'titan cannot be used without cleaning up its memory. please enable in your profile.' );
-		return $null;
-	};
+	##	warn( 'titan cannot be used without cleaning up its memory. please enable in your profile.' );
+	##	return $null;
+	##};
 
 	##
 	## Return Loader
