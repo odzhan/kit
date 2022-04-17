@@ -32,6 +32,7 @@
 #include "Pe.h"
 
 /* Include Hooks! */
+#include "hooks/WaitForSingleObject.h"
 #include "hooks/NtMapViewOfSection.h"
 #include "hooks/WriteProcessMemory.h"
 #include "hooks/ReadProcessMemory.h"
