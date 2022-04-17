@@ -21,4 +21,4 @@
  * completion.
  *
 !*/
-D_SEC( E ) NTSTATUS NTAPI NtWaitForSingleObjectObf( _In_ HANDLE Handle, _In_ BOOLEAN Alertable, _In_ PLARGE_INTEGER Timeout );
+D_SEC( E ) NTSTATUS NTAPI ObfSystemCall( _In_ PVOID Addr, _In_ PVOID* Argv, _In_ UINT32 Argc );

@@ -28,8 +28,8 @@
 #include "Hash.h"
 #include "Peb.h"
 #include "Ldr.h"
+#include "Obf.h"
 #include "Pe.h"
-#include "NtWaitForSingleObjectObf.h"
 
 /* Include Hooks! */
 #include "hooks/NtMapViewOfSection.h"

