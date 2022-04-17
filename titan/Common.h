@@ -35,6 +35,7 @@
 #include "hooks/NtMapViewOfSection.h"
 #include "hooks/WriteProcessMemory.h"
 #include "hooks/ReadProcessMemory.h"
+#include "hooks/ConnectNamedPipe.h"
 #include "hooks/VirtualProtectEx.h"
 #include "hooks/NtQueueApcThread.h"
 #include "hooks/SetThreadContext.h"

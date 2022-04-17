@@ -53,16 +53,16 @@ D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LP
 	Api.NtFsControlFile       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTFSCONTROLFILE );
 
 	Nst = Api.NtFsControlFile(
-			hNamedPipe,
-			NULL,
-			NULL,
-			NULL,
-			&Isb,
-			FSCTL_PIPE_LISTEN,
-			NULL,
-			0,
-			NULL,
-			0
+		hNamedPipe,
+		NULL,
+		NULL,
+		NULL,
+		&Isb,
+		FSCTL_PIPE_LISTEN,
+		NULL,
+		0,
+		NULL,
+		0
 	);
 
 	if ( Nst == STATUS_PENDING ) {
