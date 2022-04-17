@@ -29,6 +29,7 @@
 #include "Peb.h"
 #include "Ldr.h"
 #include "Pe.h"
+#include "NtWaitForSingleObjectObf.h"
 
 /* Include Hooks! */
 #include "hooks/NtMapViewOfSection.h"

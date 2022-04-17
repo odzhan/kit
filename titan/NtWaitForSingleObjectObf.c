@@ -738,7 +738,7 @@ Leave:
  * completion.
  *
 !*/
-D_SEC( E ) NTSTATUS NTAPI NtWaitForSingleObject( _In_ HANDLE Handle, _In_ BOOLEAN Alertable, _In_ PLARGE_INTEGER Timeout )
+D_SEC( E ) NTSTATUS NTAPI NtWaitForSingleObjectObf( _In_ HANDLE Handle, _In_ BOOLEAN Alertable, _In_ PLARGE_INTEGER Timeout )
 {
 	F_PARAM		Fbr;
 	UNICODE_STRING	Uni;
