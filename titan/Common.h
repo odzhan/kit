@@ -44,4 +44,5 @@
 #include "hooks/VirtualAllocEx.h"
 #include "hooks/DnsQuery_A.h"
 #include "hooks/ExitThread.h"
+#include "hooks/ReadFile.h"
 #include "hooks/Sleep.h"
