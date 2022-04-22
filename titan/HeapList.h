@@ -10,10 +10,9 @@
 
 #pragma once
 
-typedef struct __attribute__(( packed ))
+typedef struct
 {
-	ULONG_PTR 	RxBuffer;
-	ULONG_PTR 	RxLength;
-	ULONG_PTR 	ImageLength;
 	LIST_ENTRY	HeapList;
-} TABLE, *PTABLE ;
+	LPVOID		Buffer;
+	SIZE_T		Length;
+} HEAP_ENTRY_BEACON, *PHEAP_ENTRY_BEACON ;

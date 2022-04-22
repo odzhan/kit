@@ -22,6 +22,7 @@
 #include "Macros.h"
 
 /* Include Library */
+#include "HeapList.h"
 #include "Labels.h"
 #include "Titan.h"
 #include "Table.h"
@@ -42,7 +43,10 @@
 #include "hooks/SetThreadContext.h"
 #include "hooks/GetProcAddress.h"
 #include "hooks/VirtualAllocEx.h"
+#include "hooks/HeapReAlloc.h"
 #include "hooks/DnsQuery_A.h"
 #include "hooks/ExitThread.h"
+#include "hooks/HeapAlloc.h"
 #include "hooks/ReadFile.h"
+#include "hooks/HeapFree.h"
 #include "hooks/Sleep.h"

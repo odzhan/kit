@@ -21,8 +21,6 @@ Table:
 	;; start of hook pages
 	;;
 	dq	0
-	dq	0
-	dq	0
 
 [SECTION .text$F]
 

