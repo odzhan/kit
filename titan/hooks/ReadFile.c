@@ -111,6 +111,8 @@ D_SEC( D ) BOOL WINAPI ReadFile_Hook( _In_ HANDLE hFile, _In_ LPVOID lpBuffer, _
 				if ( lpNumberOfBytes != NULL ) {
 					*lpNumberOfBytes = Isb.Information; 
 				};
+				/* Abort */
+				break;
 			};
 		} else
 		{
