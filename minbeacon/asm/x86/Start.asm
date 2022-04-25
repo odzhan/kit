@@ -1,5 +1,5 @@
 ;;
-;; DARKPULSAR
+;; MINBEACON
 ;;
 ;; GuidePoint Security LLC
 ;;
