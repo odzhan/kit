@@ -19,9 +19,9 @@ struct arc4_context
 
 typedef struct arc4_context ARC4_CTX;
 
-D_SEC( B ) void arc4_init(struct arc4_context* ctx, void const* key, size_t key_length);
-D_SEC( B ) void arc4_process(struct arc4_context* ctx, void const* src_data, void* dst_data, size_t data_length);
-D_SEC( B ) void arc4_discard(struct arc4_context* ctx, size_t length);
+D_SEC( E ) void arc4_init(struct arc4_context* ctx, void const* key, size_t key_length);
+D_SEC( E ) void arc4_process(struct arc4_context* ctx, void const* src_data, void* dst_data, size_t data_length);
+D_SEC( E ) void arc4_discard(struct arc4_context* ctx, size_t length);
 
 #ifdef __cplusplus
 }

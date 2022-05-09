@@ -2,14 +2,14 @@
 
 #define ARC4_MAGIC 0x34637261 // 'arc4' (LE)
 
-D_SEC( B ) void arc4_swap(struct arc4_context* ctx, size_t i, size_t j)
+D_SEC( E ) void arc4_swap(struct arc4_context* ctx, size_t i, size_t j)
 {
     uint8_t const t = ctx->s[i];
     ctx->s[i] = ctx->s[j];
     ctx->s[j] = t;
 }
 
-D_SEC( B ) uint8_t arc4_next(struct arc4_context* ctx)
+D_SEC( E ) uint8_t arc4_next(struct arc4_context* ctx)
 {
     ctx->i += 1;
     ctx->j += ctx->s[ctx->i];
@@ -19,7 +19,7 @@ D_SEC( B ) uint8_t arc4_next(struct arc4_context* ctx)
     return ctx->s[(uint8_t)(ctx->s[ctx->i] + ctx->s[ctx->j])];
 }
 
-D_SEC( B ) void arc4_init(struct arc4_context* ctx, void const* key, size_t key_length)
+D_SEC( E ) void arc4_init(struct arc4_context* ctx, void const* key, size_t key_length)
 {
 #ifndef NDEBUG
     ctx->magic = ARC4_MAGIC;
@@ -40,7 +40,7 @@ D_SEC( B ) void arc4_init(struct arc4_context* ctx, void const* key, size_t key_
     }
 }
 
-D_SEC( B ) void arc4_process(struct arc4_context* ctx, void const* src_data, void* dst_data, size_t data_length)
+D_SEC( E ) void arc4_process(struct arc4_context* ctx, void const* src_data, void* dst_data, size_t data_length)
 {
     if (data_length == 0)
     {
@@ -53,7 +53,7 @@ D_SEC( B ) void arc4_process(struct arc4_context* ctx, void const* src_data, voi
     }
 }
 
-D_SEC( B ) void arc4_discard(struct arc4_context* ctx, size_t length)
+D_SEC( E ) void arc4_discard(struct arc4_context* ctx, size_t length)
 {
     for (size_t i = 0; i < length; ++i)
     {

