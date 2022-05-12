@@ -12,5 +12,7 @@
 
 #include <windows.h>
 #include <ntstatus.h>
+#include "Native.h"
 #include "Beacon.h"
 #include "Macros.h"
+#include "Token.h"

