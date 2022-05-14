@@ -1,0 +1,30 @@
+#
+# Disables any privileges and lowers the IL
+# of a token to untrusted to prevent it from
+# running.
+#
+alias noprivs {
+	#
+	# Opens the COFF object file using aggressor
+	# within the same directory as the current
+	# script.
+	#
+	$barch = barch( $1 );
+	$handl = openf( script_resource( "NoPrivsBof. $+ $barch $+ .o" ) );
+	$hbofs = readb( $handl, -1 );
+	closef( $handl );
+
+	#
+	# Creates a PID argument. 
+	#
+	$bargs = bof_pack( $1, "i", $2 );
+
+	#
+	# Deploy the COFF file with relocations applied
+	# to resolve the jumps.
+	#
+	btask( $1, "Tasked Beacon to remote privileges and lower IL for PID  $+ $2 $+ ." );
+	beacon_inline_execute( $1, $hbofs, "NoPrivsGo", $bargs );
+}
+
+beacon_command_register( "noprivs", "Disable privileges for the target process and lower IL.", "Usage: noprivs [pid]" );

