@@ -52,7 +52,11 @@ D_SEC( D ) PVOID WINAPI HeapAlloc_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Flag
 	Api.RtlAllocateHeap       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.RtlFreeHeap           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
 
+	/* Table header */
 	Tbl = C_PTR( *( PVOID * )( G_SYM( Table ) ) );
+
+	/* Lock list access */
+	LockAccess( &Tbl->HeapListLock );
 
 	/* Create a entry to hold information about the allocation */
 	if ( ( Ent = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( HEAP_ENTRY_BEACON ) ) ) != NULL ) {
@@ -81,6 +85,9 @@ D_SEC( D ) PVOID WINAPI HeapAlloc_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Flag
 		/* Notify about the lack of resources */
 		Api.RtlSetLastWin32Error( Api.RtlNtStatusToDosError( STATUS_INSUFFICIENT_RESOURCES ) );
 	};
+
+	/* Unlock list usage */
+	UnlockAccess( &Tbl->HeapListLock );
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );

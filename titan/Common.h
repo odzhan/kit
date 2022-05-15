@@ -24,6 +24,7 @@
 #include "Arc4.h"
 
 /* Include Library */
+#include "ThreadList.h"
 #include "HeapList.h"
 #include "PreMain.h"
 #include "Labels.h"
@@ -32,6 +33,7 @@
 #include "Table.h"
 #include "Hash.h"
 #include "Heap.h"
+#include "Lock.h"
 #include "Peb.h"
 #include "Ldr.h"
 #include "Obf.h"

