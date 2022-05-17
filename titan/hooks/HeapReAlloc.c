@@ -47,10 +47,6 @@ D_SEC( D ) PVOID WINAPI HeapReAlloc_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Fl
 
 	/* Get heap header and entry(s) */
 	Tbl = C_PTR( *( PVOID * )( G_SYM( Table ) ) );
-
-	/* Lock Heap Access */
-	LockAccess( &Tbl->HeapListLock );
-
 	Hdr = C_PTR( & Tbl->HeapList );
 	Ent = C_PTR( Hdr->Flink );
 
@@ -71,9 +67,6 @@ D_SEC( D ) PVOID WINAPI HeapReAlloc_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Fl
 			break;
 		};
 	};
-
-	/* Unlock Heap Access */
-	UnlockAccess( &Tbl->HeapListLock );
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );

