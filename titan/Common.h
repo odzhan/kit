@@ -48,6 +48,7 @@
 #include "hooks/SetThreadContext.h"
 #include "hooks/GetProcAddress.h"
 #include "hooks/VirtualAllocEx.h"
+#include "hooks/CreateThread.h"
 #include "hooks/HeapReAlloc.h"
 #include "hooks/DnsQuery_A.h"
 #include "hooks/ExitThread.h"
