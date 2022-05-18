@@ -46,8 +46,8 @@ D_SEC( D ) PVOID WINAPI HeapReAlloc_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Fl
 	Api.RtlReAllocateHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
 
 	/* Get heap header and entry(s) */
-	Tbl = C_PTR( *( PVOID * )( G_SYM( Table ) ) );
-	Hdr = C_PTR( & Tbl->HeapList );
+	Tbl = C_PTR( G_SYM( Table ) );
+	Hdr = C_PTR( & Tbl->Table->HeapList );
 	Ent = C_PTR( Hdr->Flink );
 
 	/* Enumerate heap entries */

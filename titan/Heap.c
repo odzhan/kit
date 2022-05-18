@@ -34,8 +34,8 @@ D_SEC( E ) VOID HeapEncryptDecrypt( _In_ PCHAR Key, _In_ UINT32 KeyLength )
 	arc4_init( &Arc, Key, KeyLength );
 
 	/* Setup heap buffer list */
-	Tbl = C_PTR( *( PVOID * )( G_SYM( Table ) ) );
-	Hdr = C_PTR( & Tbl->HeapList );
+	Tbl = C_PTR( G_SYM( Table ) );
+	Hdr = C_PTR( & Tbl->Table->HeapList );
 	Ent = C_PTR( Hdr->Flink );
 
 	/* Enumerate the complete list of entries */

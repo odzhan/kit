@@ -10,6 +10,7 @@
 
 #pragma once
 
+/* Table allocated and stored on a test */
 typedef struct __attribute__(( packed ))
 {
 	ULONG_PTR 	RxBuffer;
@@ -17,4 +18,9 @@ typedef struct __attribute__(( packed ))
 	ULONG_PTR 	ImageLength;
 
 	LIST_ENTRY	HeapList;
+} TABLE_HEAP, *PTABLE_HEAP ;
+
+typedef struct __attribute__(( packed ))
+{
+	PTABLE_HEAP	Table;
 } TABLE, *PTABLE ;

@@ -45,8 +45,8 @@ D_SEC( D ) BOOL WINAPI HeapFree_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Flags,
 	Api.RtlFreeHeap = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
 
 	/* Get table header and entry(s) */
-	Tbl = C_PTR( *( PVOID * )( G_SYM( Table ) ) );
-	Hdr = C_PTR( & Tbl->HeapList );
+	Tbl = C_PTR( G_SYM( Table ) );
+	Hdr = C_PTR( & Tbl->Table->HeapList );
 	Ent = C_PTR( Hdr->Flink );
 
 	/* Enumerate the complete list of entries */

