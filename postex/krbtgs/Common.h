@@ -17,3 +17,5 @@
 #include "Native.h"
 #include "Beacon.h"
 #include "Macros.h"
+
+#include "KrbForgeTicket.h"
