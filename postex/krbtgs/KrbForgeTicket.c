@@ -89,7 +89,6 @@ BOOL KrbForgeTicket( _In_ PCHAR ServicePrincipalName, _In_ ULONG EncryptionType,
 				/* Did we succeed in delegation? */
 				if ( Att & ISC_REQ_DELEGATE ) {
 
-
 				};
 				/* Free the context buffer and security context */
 				Api.FreeContextBuffer( Buf.pvBuffer );

