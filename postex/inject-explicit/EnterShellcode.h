@@ -19,4 +19,4 @@
  * process.
  *
 !*/
-VOID EnterShellcode( _In_ PVOID Function, _In_ DWORD Pid, DWORD Offset, PVOID Buffer, _In_ DWORD Length, _Out_ DWORD* Return );
+DWORD EnterShellcode( _In_ PVOID Function, _In_ DWORD Pid, DWORD Offset, PVOID Buffer, _In_ DWORD Length );

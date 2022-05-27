@@ -131,9 +131,9 @@ VOID InjectExplicitGo( _In_ PVOID Argv, _In_ INT Argc, _In_ BOOLEAN x64 )
 				} else 
 				{
 					#if ! defined( _WIN64 )
-					EnterShellcode( Payload32, Pid, Ofs, Buf, Len, &Ret );
+					Ret = EnterShellcode( Payload32, Pid, Ofs, Buf, Len );
 					#else
-					EnterShellcode( Payload64, Pid, Ofs, Buf, Len, &Ret );
+					Ret = EnterShellcode( Payload64, Pid, Ofs, Buf, Len );
 					#endif
 				};
 			} while ( 0 );

@@ -19,11 +19,18 @@
  * process.
  *
 !*/
-VOID EnterShellcode( _In_ PVOID Function, _In_ DWORD Pid, DWORD Offset, PVOID Buffer, _In_ DWORD Length, _Out_ DWORD* Return )
+DWORD EnterShellcode( _In_ PVOID Function, _In_ DWORD Pid, DWORD Offset, PVOID Buffer, _In_ DWORD Length )
 {
 	/* Are we null? No! */
 	if ( Function != NULL ) {
 		/* Executes the embedded shellcodes as __cdecl */
-		( ( VOID __cdecl ( * )( DWORD, DWORD, PVOID, DWORD, PDWORD ) ) Function )( Pid, Offset, Buffer, Length, Return );
+		return ( ( DWORD __cdecl ( * )( DWORD, DWORD, PVOID, DWORD ) ) Function )( 
+				Pid, 
+				Offset, 
+				Buffer, 
+				Length 
+		);
 	};
+	/* None */
+	return 0;
 };
