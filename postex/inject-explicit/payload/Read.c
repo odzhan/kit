@@ -27,9 +27,11 @@ typedef struct _THREAD_TEB_INFORMATION
 
 typedef struct
 {
+	D_API( NtQuerySystemInformation );
 	D_API( NtQueryInformationThread );
 	D_API( NtWaitForSingleObject );
 	D_API( RtlCopyMappedMemory );
+	D_API( RtlReAllocateHeap );
 	D_API( NtTerminateThread );
 	D_API( NtDuplicateObject );
 	D_API( RtlExitUserThread );
@@ -43,9 +45,11 @@ typedef struct
 } API ;
 
 /* API Hashes */
+#define H_API_NTQUERYSYSTEMINFORMATION	0x7bc23928 /* NtQuerySystemInformation */
 #define H_API_NTQUERYINFORMATIONTHREAD	0xf5a0461b /* NtQueryInformationThread */	
 #define H_API_NTWAITFORSINGLEOBJECT	0xe8ac0c3c /* NtWaitForSingleObject */
 #define H_API_RTLCOPYMAPPEDMEMORY	0x5b56b302 /* RtlCopyMappedMemory */
+#define H_API_RTLREALLOCATEHEAP		0xaf740371 /* RtlReAllocateHeap */
 #define H_API_NTTERMINATETHREAD		0xccf58808 /* NtTerminateThread */
 #define H_API_NTDUPLICATEOBJECT		0x4441d859 /* NtDuplicateObject */
 #define H_API_RTLEXITUSERTHREAD		0x2f6db5e8 /* RtlExitUserThread */
@@ -80,9 +84,11 @@ D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 	API				Api;
 	THREAD_TEB_INFORMATION		Tti;
 	THREAD_BASIC_INFORMATION	Tbi;
-	SYSTEM_THREAD_INFORMATION	Sti;
 
+	BOOLEAN				Ret = FALSE;
+	BOOLEAN				Cmp = FALSE;
 	SIZE_T				Inl = 0;
+	THREAD_STATE			Kts = StateInitialized;
 
 	HANDLE				Thd = NULL;
 	HANDLE				Ev1 = NULL;
@@ -94,11 +100,12 @@ D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Tti, sizeof( Tti ) );
 	RtlSecureZeroMemory( &Tbi, sizeof( Tbi ) );
-	RtlSecureZeroMemory( &Sti, sizeof( Sti ) );
 
+	Api.NtQuerySystemInformation = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTQUERYSYSTEMINFORMATION );
 	Api.NtQueryInformationThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTQUERYINFORMATIONTHREAD ); 
 	Api.NtWaitForSingleObject    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTWAITFORSINGLEOBJECT );
 	Api.RtlCopyMappedMemory      = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCOPYMAPPEDMEMORY );
+	Api.RtlReAllocateHeap        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
 	Api.NtTerminateThread        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTTERMINATETHREAD );
 	Api.NtDuplicateObject        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTDUPLICATEOBJECT );
 	Api.RtlExitUserThread        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLEXITUSERTHREAD );
@@ -126,13 +133,61 @@ D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 							if ( NT_SUCCESS( Api.NtQueueApcThread( Thd, Api.NtWaitForSingleObject, Ev2, FALSE, NULL ) ) ) {
 								/* Resume the thread, then we check its status */
 								if ( NT_SUCCESS( Api.NtResumeThread( Thd, NULL ) ) ) {
-									for ( ;; ) 
+									for ( ; Kts != StateWait ; ) 
 									{
 										/* Allocate a buffer to hold the initial buffer information */
 										Inl = 0x1000;
 										Spi = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Inl );
 
 										/* Query information about the current system! */
+										while ( Api.NtQuerySystemInformation( SystemProcessInformation, &Spi, Inl, NULL ) == STATUS_INFO_LENGTH_MISMATCH ) {
+											Inl = Inl + 0x1000;
+											Tmp = C_PTR( Api.RtlReAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Spi, Inl ) );
+
+											if ( Tmp == NULL ) {
+												Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Spi );
+												Spi = NULL;
+												break;
+											};
+											Spi = C_PTR( Tmp );
+										};
+										if ( Spi != NULL ) {
+											Tmp = C_PTR( Spi );
+											
+											/* Enumerate each individual process */
+											do {
+												/* Enumerate each individual thread */
+												for ( INT Idx = 0 ; Idx < Spi->NumberOfThreads ; ++Idx ) {
+													/* Is this our target thread ? */
+													if ( Tmp->Threads[ Idx ].ClientId.UniqueThread == Tbi.ClientId.UniqueThread && 
+													     Tmp->Threads[ Idx ].ClientId.UniqueProcess == Tbi.ClientId.UniqueProcess ) 
+													{
+														/* Read the thread state */
+														Kts = Tmp->Threads[ Idx ].State;
+														break;
+													};
+												};
+												/* In the state we need? Abort! */
+												if ( Kts == StateWait ) {
+													break;
+												};
+												/* Move onto the next process! */
+												Tmp = C_PTR( U_PTR( Tmp ) + Tmp->NextEntryOffset );
+											} while ( Tmp->NextEntryOffset != 0 );
+											
+											/* Free the process information */
+											Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Spi );
+										};
+									};
+
+									/* Success. We can now read the result! */
+									Tti.TebInformation = C_PTR( U_PTR( Buffer ) + Length );
+									Tti.TebOffset      = FIELD_OFFSET( TEB, ClientId.UniqueThread );
+									Tti.BytesToRead    = 1;
+
+									/* Success! */
+									if ( NT_SUCCESS( Api.NtQueryInformationThread( Thd, ThreadTebInformation, &Tti, sizeof( Tti ), NULL ) ) ) {
+										Cmp = TRUE;
 									};
 								};
 							};
@@ -146,11 +201,19 @@ D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 			Api.NtTerminateThread( Thd, STATUS_SUCCESS );
 			Api.NtClose( Thd );
 		};
+		/* Did we fail to complete? */
+		if ( Cmp != TRUE ) 
+		{
+			/* Abort! */
+			break;
+		} else {
+			/* Reset! */
+			Cmp = FALSE;
+		};
 	};
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Tti, sizeof( Tti ) );
 	RtlSecureZeroMemory( &Tbi, sizeof( Tbi ) );
-	RtlSecureZeroMemory( &Sti, sizeof( Sti ) );
 };
