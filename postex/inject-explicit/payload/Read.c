@@ -181,7 +181,7 @@ D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 									};
 
 									/* Success. We can now read the result! */
-									Tti.TebInformation = C_PTR( U_PTR( Buffer ) + Length );
+									Tti.TebInformation = C_PTR( U_PTR( Buffer ) + Len );
 									Tti.TebOffset      = FIELD_OFFSET( TEB, ClientId.UniqueThread );
 									Tti.BytesToRead    = 1;
 
