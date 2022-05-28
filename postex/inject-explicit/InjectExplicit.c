@@ -122,7 +122,10 @@ VOID InjectExplicitGo( _In_ PVOID Argv, _In_ INT Argc, _In_ BOOLEAN x64 )
 					break;
 				};
 
-				/* Use heavens gate to execute our code or go native? */
+				if ( IsProcessWow64( Prc ) == TRUE && IsProcessWow64( NtCurrentProcess() ) == FALSE ) {
+					BeaconPrintf( CALLBACK_ERROR, "Beacon cannot inject x86 process from x64 beacon." );
+					break;
+				};
 				if ( IsProcessWow64( Prc ) != TRUE && IsProcessWow64( NtCurrentProcess() ) != FALSE ) 
 				{
 					#if ! defined( _WIN64 )

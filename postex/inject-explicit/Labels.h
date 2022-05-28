@@ -22,5 +22,5 @@ static VOID __cdecl EnterShellcode64(
 	DWORD64, 
 	DWORD64, 
 	DWORD64, 
-	DWORD32
+	PDWORD
 );

