@@ -79,7 +79,7 @@ typedef struct
  * access.
  *
 !*/
-D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ PVOID Buffer, _In_ SIZE_T Length )
+D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ PVOID Buffer, _In_ SIZE_T Length )
 {
 	API				Api;
 	THREAD_TEB_INFORMATION		Tti;
@@ -140,7 +140,7 @@ D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 										Spi = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Inl );
 
 										/* Query information about the current system! */
-										while ( Api.NtQuerySystemInformation( SystemProcessInformation, &Spi, Inl, NULL ) == STATUS_INFO_LENGTH_MISMATCH ) {
+										while ( Api.NtQuerySystemInformation( SystemProcessInformation, Spi, Inl, NULL ) == STATUS_INFO_LENGTH_MISMATCH ) {
 											Inl = Inl + 0x1000;
 											Tmp = C_PTR( Api.RtlReAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Spi, Inl ) );
 
@@ -157,7 +157,7 @@ D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 											/* Enumerate each individual process */
 											do {
 												/* Enumerate each individual thread */
-												for ( INT Idx = 0 ; Idx < Spi->NumberOfThreads ; ++Idx ) {
+												for ( INT Idx = 0 ; Idx < Tmp->NumberOfThreads ; ++Idx ) {
 													/* Is this our target thread ? */
 													if ( Tmp->Threads[ Idx ].ClientId.UniqueThread == Tbi.ClientId.UniqueThread && 
 													     Tmp->Threads[ Idx ].ClientId.UniqueProcess == Tbi.ClientId.UniqueProcess ) 
@@ -180,12 +180,12 @@ D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 										};
 									};
 
-									/* Success. We can now read the result! */
+									/* We read the result from TEB.ClientId.UniqueThread*/
 									Tti.TebInformation = C_PTR( U_PTR( Buffer ) + Len );
 									Tti.TebOffset      = FIELD_OFFSET( TEB, ClientId.UniqueThread );
 									Tti.BytesToRead    = 1;
 
-									/* Success! */
+									/* Attempt to read the result from UniqueThread in TEB. On success, notify that this read was a success! */
 									if ( NT_SUCCESS( Api.NtQueryInformationThread( Thd, ThreadTebInformation, &Tti, sizeof( Tti ), NULL ) ) ) {
 										Cmp = TRUE;
 									};
@@ -204,11 +204,13 @@ D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 		/* Did we fail to complete? */
 		if ( Cmp != TRUE ) 
 		{
-			/* Abort! */
+			/* End the loop, and end the read. */
+			Ret = FALSE;
 			break;
 		} else {
-			/* Reset! */
+			/* Reset and restart loop ! */
 			Cmp = FALSE;
+			Ret = Len < Length ? FALSE : TRUE;
 		};
 	};
 
@@ -216,4 +218,7 @@ D_SEC( B ) VOID ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Tti, sizeof( Tti ) );
 	RtlSecureZeroMemory( &Tbi, sizeof( Tbi ) );
+
+	/* Status */
+	return Ret;
 };

@@ -41,6 +41,9 @@ D_SEC( A ) DWORD __cdecl Entry( _In_ DWORD Pid, _In_ DWORD Offset, _In_ PVOID Bu
 	CLIENT_ID		Cid;
 	OBJECT_ATTRIBUTES	Att;
 
+	BYTE			Mag = 0x41;
+	BYTE			Val = 0x42;
+
 	HANDLE			Thd = NULL;
 	HANDLE			Prc = NULL;
 
