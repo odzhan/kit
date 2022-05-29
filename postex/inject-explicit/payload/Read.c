@@ -33,13 +33,11 @@ typedef struct
 	D_API( RtlCopyMappedMemory );
 	D_API( RtlReAllocateHeap );
 	D_API( NtTerminateThread );
-	D_API( NtDuplicateObject );
 	D_API( RtlExitUserThread );
 	D_API( NtCreateThreadEx );
 	D_API( NtQueueApcThread );
 	D_API( RtlAllocateHeap );
 	D_API( NtResumeThread );
-	D_API( NtCreateEvent );
 	D_API( RtlFreeHeap );
 	D_API( NtClose );
 } API ;
@@ -51,13 +49,11 @@ typedef struct
 #define H_API_RTLCOPYMAPPEDMEMORY	0x5b56b302 /* RtlCopyMappedMemory */
 #define H_API_RTLREALLOCATEHEAP		0xaf740371 /* RtlReAllocateHeap */
 #define H_API_NTTERMINATETHREAD		0xccf58808 /* NtTerminateThread */
-#define H_API_NTDUPLICATEOBJECT		0x4441d859 /* NtDuplicateObject */
 #define H_API_RTLEXITUSERTHREAD		0x2f6db5e8 /* RtlExitUserThread */
 #define H_API_NTCREATETHREADEX		0xaf18cfb0 /* NtCreateThreadEx */
 #define H_API_NTQUEUEAPCTHREAD		0x0a6664b8 /* NtQueueApcThread */
 #define H_API_RTLALLOCATEHEAP		0x3be94c5a /* RtlAllocateHeap */
 #define H_API_NTRESUMETHREAD		0x5a4bc3d0 /* NtResumeThread */	
-#define H_API_NTCREATEEVENT		0x28d3233d /* NtCreateEvent */
 #define H_API_RTLFREEHEAP		0x73a9e4d7 /* RtlFreeHeap */
 #define H_API_NTCLOSE			0x40d6e69d /* NtClose */
 
@@ -75,8 +71,7 @@ typedef struct
  * ThreadTebInformation to read the value using a call
  * to NtQueryInformationThread.
  *
- * Requires PROCESS_CREATE_THREAD | PROCESS_DUP_HANDLE
- * access.
+ * Requires PROCESS_CREATE_THREAD access.
  *
 !*/
 D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ PVOID Buffer, _In_ SIZE_T Length )
@@ -91,8 +86,6 @@ D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 	THREAD_STATE			Kts = StateInitialized;
 
 	HANDLE				Thd = NULL;
-	HANDLE				Ev1 = NULL;
-	HANDLE				Ev2 = NULL;
 	PSYSTEM_PROCESS_INFORMATION	Tmp = NULL;
 	PSYSTEM_PROCESS_INFORMATION	Spi = NULL;
 
@@ -107,13 +100,11 @@ D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 	Api.RtlCopyMappedMemory      = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCOPYMAPPEDMEMORY );
 	Api.RtlReAllocateHeap        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREALLOCATEHEAP );
 	Api.NtTerminateThread        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTTERMINATETHREAD );
-	Api.NtDuplicateObject        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTDUPLICATEOBJECT );
 	Api.RtlExitUserThread        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLEXITUSERTHREAD );
 	Api.NtCreateThreadEx         = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCREATETHREADEX );
 	Api.NtQueueApcThread         = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTQUEUEAPCTHREAD );
 	Api.RtlAllocateHeap          = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.NtResumeThread           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTRESUMETHREAD );
-	Api.NtCreateEvent            = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCREATEEVENT );
 	Api.RtlFreeHeap              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
 	Api.NtClose                  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCLOSE );
 
@@ -123,83 +114,75 @@ D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 		if ( NT_SUCCESS( Api.NtCreateThreadEx( &Thd, THREAD_ALL_ACCESS, NULL, Process, Api.RtlExitUserThread, NULL, TRUE, 0, 0x1000 * 2, 0x1000, NULL ) ) ) {
 			/* Find the address of the Thread Environment Block */
 			if ( NT_SUCCESS( Api.NtQueryInformationThread( Thd, ThreadBasicInformation, &Tbi, sizeof( Tbi ), NULL ) ) ) {
-				/* Create a synchronization event to prevent it from dieing prematuraly */
-				if ( NT_SUCCESS( Api.NtCreateEvent( &Ev1, EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE ) ) ) {
-					/* Duplicate a handle over so we can sync */
-					if ( NT_SUCCESS( Api.NtDuplicateObject( NtCurrentProcess( ), Ev1, Process, &Ev2, 0, 0, DUPLICATE_SAME_ACCESS ) ) ) {
-						/* Queue to copy the region of memory one byte over to ClientId.UniqueThread */
-						if ( NT_SUCCESS( Api.NtQueueApcThread( Thd, Api.RtlCopyMappedMemory, C_PTR( U_PTR( Tbi.TebBaseAddress ) + FIELD_OFFSET( TEB, ClientId.UniqueThread ) ), C_PTR( U_PTR( Address ) + Len ), 1 ) ) ) {
-							/* Queue a 'block' so that we wait */
-							if ( NT_SUCCESS( Api.NtQueueApcThread( Thd, Api.NtWaitForSingleObject, Ev2, FALSE, NULL ) ) ) {
-								/* Resume the thread, then we check its status */
-								if ( NT_SUCCESS( Api.NtResumeThread( Thd, NULL ) ) ) {
-									for ( Kts = StateInitialized ; Kts != StateWait ; ) 
-									{
-										/* Allocate a buffer to hold the initial buffer information */
-										Inl = 0x1000;
-										Spi = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Inl );
+				/* Queue to copy the region of memory one byte over to ClientId.UniqueThread */
+				if ( NT_SUCCESS( Api.NtQueueApcThread( Thd, Api.RtlCopyMappedMemory, C_PTR( U_PTR( Tbi.TebBaseAddress ) + FIELD_OFFSET( TEB, ClientId.UniqueThread ) ), C_PTR( U_PTR( Address ) + Len ), 1 ) ) ) {
+					/* Queue a 'block' so that we wait */
+					if ( NT_SUCCESS( Api.NtQueueApcThread( Thd, Api.NtWaitForSingleObject, NtCurrentThread(), FALSE, NULL ) ) ) {
+						/* Resume the thread, then we check its status */
+						if ( NT_SUCCESS( Api.NtResumeThread( Thd, NULL ) ) ) {
+							for ( Kts = StateInitialized ; Kts != StateWait ; ) 
+							{
+								/* Allocate a buffer to hold the initial buffer information */
+								Inl = 0x1000;
+								Spi = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Inl );
 
-										/* Query information about the current system! */
-										while ( ! NT_SUCCESS( Api.NtQuerySystemInformation( SystemProcessInformation, Spi, Inl, NULL ) ) ) {
-											Inl = Inl + 0x1000;
-											Tmp = C_PTR( Api.RtlReAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Spi, Inl ) );
+								/* Query information about the current system! */
+								while ( ! NT_SUCCESS( Api.NtQuerySystemInformation( SystemProcessInformation, Spi, Inl, NULL ) ) ) {
+									Inl = Inl + 0x1000;
+									Tmp = C_PTR( Api.RtlReAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Spi, Inl ) );
 
-											if ( Tmp == NULL ) {
-												Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Spi );
-												Spi = NULL;
-												break;
-											};
-											Spi = C_PTR( Tmp );
-										};
-										if ( Spi != NULL ) {
-											Tmp = C_PTR( Spi );
+									if ( Tmp == NULL ) {
+										Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Spi );
+										Spi = NULL;
+										break;
+									};
+									Spi = C_PTR( Tmp );
+								};
+								if ( Spi != NULL ) {
+									Tmp = C_PTR( Spi );
 											
-											/* Enumerate each individual process */
-											do {
-												if ( Tmp->UniqueProcessId == Tbi.ClientId.UniqueProcess ) {
-													/* Enumerate each individual thread */
-													for ( INT Idx = 0 ; Idx < Tmp->NumberOfThreads ; ++Idx ) {
-														/* Is this our target thread ? */
-														if ( Tmp->Threads[ Idx ].ClientId.UniqueThread == Tbi.ClientId.UniqueThread ) {
-															/* Read the thread state */
-															Kts = Tmp->Threads[ Idx ].State;
-															break;
-														};
-													};
-													/* Enumerated our process! */
+									/* Enumerate each individual process */
+									do {
+										if ( Tmp->UniqueProcessId == Tbi.ClientId.UniqueProcess ) {
+											/* Enumerate each individual thread */
+											for ( INT Idx = 0 ; Idx < Tmp->NumberOfThreads ; ++Idx ) {
+												/* Is this our target thread ? */
+												if ( Tmp->Threads[ Idx ].ClientId.UniqueThread == Tbi.ClientId.UniqueThread ) {
+													/* Read the thread state */
+													Kts = Tmp->Threads[ Idx ].State;
 													break;
 												};
-												/* Move onto the next process! */
-												Tmp = C_PTR( U_PTR( Tmp ) + Tmp->NextEntryOffset );
-											} while ( Tmp->NextEntryOffset != 0 );
-											
-											/* Free the process information */
-											Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Spi );
-										};
-										/* Did our thread get terminated? */
-										if ( Kts == StateTerminated ) {
-											/* Abort! */
+											};
+											/* Enumerated our process! */
 											break;
 										};
-									};
-									/* Is our thread waiting? */
-									if ( Kts == StateWait ) {
-										/* We read the result from TEB.ClientId.UniqueThread*/
-										Tti.TebInformation = C_PTR( U_PTR( Buffer ) + Len );
-										Tti.TebOffset      = FIELD_OFFSET( TEB, ClientId.UniqueThread );
-										Tti.BytesToRead    = 1;
+										/* Move onto the next process! */
+										Tmp = C_PTR( U_PTR( Tmp ) + Tmp->NextEntryOffset );
+									} while ( Tmp->NextEntryOffset != 0 );
+										
+									/* Free the process information */
+									Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Spi );
+								};
+								/* Did our thread get terminated? */
+								if ( Kts == StateTerminated ) {
+									/* Abort! */
+									break;
+								};
+							};
+							/* Is our thread waiting? */
+							if ( Kts == StateWait ) {
+								/* We read the result from TEB.ClientId.UniqueThread*/
+								Tti.TebInformation = C_PTR( U_PTR( Buffer ) + Len );
+								Tti.TebOffset      = FIELD_OFFSET( TEB, ClientId.UniqueThread );
+								Tti.BytesToRead    = 1;
 
-										/* Attempt to read the result from UniqueThread in TEB. On success, notify that this read was a success! */
-										if ( NT_SUCCESS( Api.NtQueryInformationThread( Thd, ThreadTebInformation, &Tti, sizeof( Tti ), NULL ) ) ) {
-											Cmp = TRUE;
-										};
-									};
+								/* Attempt to read the result from UniqueThread in TEB. On success, notify that this read was a success! */
+								if ( NT_SUCCESS( Api.NtQueryInformationThread( Thd, ThreadTebInformation, &Tti, sizeof( Tti ), NULL ) ) ) {
+									Cmp = TRUE;
 								};
 							};
 						};
 					};
-					/* Close! */
-					Api.NtClose( Ev1 );
 				};
 			};
 			/* Terminate the running thread and close! */
