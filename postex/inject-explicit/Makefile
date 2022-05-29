@@ -21,6 +21,7 @@ LFLAGS := -Wl,-s,--exclude-all-symbols,--no-leading-underscore
 
 all: $(OBJECT)
 	nasm -f win32 asm/x86/EnterShellcode.asm -o EnterShellcodeAsm.x86.o
+	nasm -f win64 asm/x64/EnterShellcode.asm -o EnterShellcodeAsm.x64.o
 	$(LD_x64) -x -r *.x64.o -o $(OUTx64)
 	$(LD_x86) -x -r *.x86.o -o $(OUTx86)
 

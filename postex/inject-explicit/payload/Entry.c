@@ -41,8 +41,8 @@ D_SEC( A ) DWORD __cdecl Entry( _In_ DWORD Pid, _In_ DWORD Offset, _In_ PVOID Bu
 	CLIENT_ID		Cid;
 	OBJECT_ATTRIBUTES	Att;
 
-	BYTE			Mag = 0x41;
-	BYTE			Val = 0x42;
+	UINT16			Mag = 0x4142;
+	UINT16			Val = 0x4344;
 
 	HANDLE			Thd = NULL;
 	HANDLE			Prc = NULL;
@@ -62,6 +62,8 @@ D_SEC( A ) DWORD __cdecl Entry( _In_ DWORD Pid, _In_ DWORD Offset, _In_ PVOID Bu
 
 	/* Open up the target process to create threads within. */
 	if ( NT_SUCCESS( Api.NtOpenProcess( &Prc, PROCESS_CREATE_THREAD | PROCESS_DUP_HANDLE, &Att, &Cid ) ) ) {
+		if ( ReadRemoteMemory( NtCurrentProcess(), &Mag, &Val, sizeof( Val ) ) ) {
+		};
 		/* Close Reference! */
 		Api.NtClose( Prc );
 	};
@@ -70,4 +72,6 @@ D_SEC( A ) DWORD __cdecl Entry( _In_ DWORD Pid, _In_ DWORD Offset, _In_ PVOID Bu
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Cid, sizeof( Cid ) );
 	RtlSecureZeroMemory( &Att, sizeof( Att ) );
+
+	return Val;
 };

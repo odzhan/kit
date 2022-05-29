@@ -133,14 +133,14 @@ D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 							if ( NT_SUCCESS( Api.NtQueueApcThread( Thd, Api.NtWaitForSingleObject, Ev2, FALSE, NULL ) ) ) {
 								/* Resume the thread, then we check its status */
 								if ( NT_SUCCESS( Api.NtResumeThread( Thd, NULL ) ) ) {
-									for ( ; Kts != StateWait ; ) 
+									for ( Kts = StateInitialized ; Kts != StateWait ; ) 
 									{
 										/* Allocate a buffer to hold the initial buffer information */
 										Inl = 0x1000;
 										Spi = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Inl );
 
 										/* Query information about the current system! */
-										while ( Api.NtQuerySystemInformation( SystemProcessInformation, Spi, Inl, NULL ) == STATUS_INFO_LENGTH_MISMATCH ) {
+										while ( ! NT_SUCCESS( Api.NtQuerySystemInformation( SystemProcessInformation, Spi, Inl, NULL ) ) ) {
 											Inl = Inl + 0x1000;
 											Tmp = C_PTR( Api.RtlReAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Spi, Inl ) );
 
@@ -156,19 +156,17 @@ D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 											
 											/* Enumerate each individual process */
 											do {
-												/* Enumerate each individual thread */
-												for ( INT Idx = 0 ; Idx < Tmp->NumberOfThreads ; ++Idx ) {
-													/* Is this our target thread ? */
-													if ( Tmp->Threads[ Idx ].ClientId.UniqueThread == Tbi.ClientId.UniqueThread && 
-													     Tmp->Threads[ Idx ].ClientId.UniqueProcess == Tbi.ClientId.UniqueProcess ) 
-													{
-														/* Read the thread state */
-														Kts = Tmp->Threads[ Idx ].State;
-														break;
+												if ( Tmp->UniqueProcessId == Tbi.ClientId.UniqueProcess ) {
+													/* Enumerate each individual thread */
+													for ( INT Idx = 0 ; Idx < Tmp->NumberOfThreads ; ++Idx ) {
+														/* Is this our target thread ? */
+														if ( Tmp->Threads[ Idx ].ClientId.UniqueThread == Tbi.ClientId.UniqueThread ) {
+															/* Read the thread state */
+															Kts = Tmp->Threads[ Idx ].State;
+															break;
+														};
 													};
-												};
-												/* In the state we need? Abort! */
-												if ( Kts == StateWait ) {
+													/* Enumerated our process! */
 													break;
 												};
 												/* Move onto the next process! */
@@ -178,16 +176,23 @@ D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 											/* Free the process information */
 											Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Spi );
 										};
+										/* Did our thread get terminated? */
+										if ( Kts == StateTerminated ) {
+											/* Abort! */
+											break;
+										};
 									};
+									/* Is our thread waiting? */
+									if ( Kts == StateWait ) {
+										/* We read the result from TEB.ClientId.UniqueThread*/
+										Tti.TebInformation = C_PTR( U_PTR( Buffer ) + Len );
+										Tti.TebOffset      = FIELD_OFFSET( TEB, ClientId.UniqueThread );
+										Tti.BytesToRead    = 1;
 
-									/* We read the result from TEB.ClientId.UniqueThread*/
-									Tti.TebInformation = C_PTR( U_PTR( Buffer ) + Len );
-									Tti.TebOffset      = FIELD_OFFSET( TEB, ClientId.UniqueThread );
-									Tti.BytesToRead    = 1;
-
-									/* Attempt to read the result from UniqueThread in TEB. On success, notify that this read was a success! */
-									if ( NT_SUCCESS( Api.NtQueryInformationThread( Thd, ThreadTebInformation, &Tti, sizeof( Tti ), NULL ) ) ) {
-										Cmp = TRUE;
+										/* Attempt to read the result from UniqueThread in TEB. On success, notify that this read was a success! */
+										if ( NT_SUCCESS( Api.NtQueryInformationThread( Thd, ThreadTebInformation, &Tti, sizeof( Tti ), NULL ) ) ) {
+											Cmp = TRUE;
+										};
 									};
 								};
 							};
