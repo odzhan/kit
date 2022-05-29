@@ -128,14 +128,18 @@ D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 
 								/* Query information about the current system! */
 								while ( ! NT_SUCCESS( Api.NtQuerySystemInformation( SystemProcessInformation, Spi, Inl, NULL ) ) ) {
+
+									/* Extend the size of the buffer cause we failed */
 									Inl = Inl + 0x1000;
 									Tmp = C_PTR( Api.RtlReAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, Spi, Inl ) );
 
+									/* Abort! Allocation failed :( */
 									if ( Tmp == NULL ) {
 										Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Spi );
 										Spi = NULL;
 										break;
 									};
+									/* Set new pointer */
 									Spi = C_PTR( Tmp );
 								};
 								if ( Spi != NULL ) {

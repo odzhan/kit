@@ -62,6 +62,8 @@ D_SEC( A ) DWORD __cdecl Entry( _In_ DWORD Pid, _In_ DWORD Offset, _In_ PVOID Bu
 
 	/* Open up the target process to create threads within. */
 	if ( NT_SUCCESS( Api.NtOpenProcess( &Prc, PROCESS_CREATE_THREAD, &Att, &Cid ) ) ) {
+		if ( WriteRemoteMemory( NtCurrentProcess(), &Val, &Mag, sizeof( Mag ) ) ) {
+		};
 		/* Close Reference! */
 		Api.NtClose( Prc );
 	};

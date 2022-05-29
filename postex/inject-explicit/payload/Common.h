@@ -16,6 +16,8 @@
 #include "Macros.h"
 #include "Labels.h"
 #include "Hash.h"
-#include "Read.h"
 #include "Peb.h"
 #include "Pe.h"
+
+#include "Write.h"
+#include "Read.h"
