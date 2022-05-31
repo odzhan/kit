@@ -265,7 +265,7 @@ static D_SEC( B ) VOID WINAPI Sleep_Call( _In_ PF_PARAM Fbr )
 		Rc4.Length = Rc4.MaximumLength = U_PTR( Fbr->Length );
 
 		if ( NT_SUCCESS( Api.NtCreateEvent( &Evt, EVENT_ALL_ACCESS, NULL, SynchronizationEvent, FALSE ) ) ) {
-			if ( NT_SUCCESS( Api.NtCreateThreadEx( &Thd, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), C_PTR( U_PTR( Dos ) + Nth->OptionalHeader.AddressOfEntryPoint ), NULL, TRUE, 0, 0x1000 * 20, 0x1000 * 20, NULL ) ) ) {
+			if ( NT_SUCCESS( Api.NtCreateThreadEx( &Thd, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), C_PTR( U_PTR( Dos ) + Nth->OptionalHeader.AddressOfEntryPoint ), NULL, CREATE_SUSPENDED, 0, 0x1000 * 20, 0x1000 * 20, NULL ) ) ) {
 				
 				Ini = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) );
 				if ( Ini == NULL ) {

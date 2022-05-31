@@ -22,4 +22,4 @@
  * Requires PROCESS_CREATE_THREAD access
  *
 !*/
-D_SEC( B ) BOOL WriteRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ PVOID Buffer, _In_ SIZE_T Length );
+D_SEC( B ) VOID WriteRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ PVOID Buffer, _In_ SIZE_T Length );

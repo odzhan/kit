@@ -60,12 +60,12 @@ typedef struct
  * Requires PROCESS_CREATE_THREAD access
  *
 !*/
-D_SEC( B ) BOOL WriteRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ PVOID Buffer, _In_ SIZE_T Length )
+D_SEC( B ) VOID WriteRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ PVOID Buffer, _In_ SIZE_T Length )
 {
 	API				Api;
 	THREAD_BASIC_INFORMATION	Tbi;
 
-	BOOLEAN				Ret = FALSE;
+	BOOLEAN				Ret = TRUE;
 	BOOLEAN				Cmp = FALSE;
 
 	PUCHAR				Buf = C_PTR( Buffer );
@@ -87,7 +87,7 @@ D_SEC( B ) BOOL WriteRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_
 	/* Write one byte at a time until complete */
 	for ( SIZE_T Len = 0 ; Len < Length ; ++Len ) {
 		/* Create a suspended thread at a routine to kill it */
-		if ( NT_SUCCESS( Api.NtCreateThreadEx( &Thd, THREAD_ALL_ACCESS, NULL, Process, Api.RtlExitUserThread, STATUS_UNSUCCESSFUL, TRUE, 0, 0x1000 * 2, 0x1000, NULL ) ) ) {
+		if ( NT_SUCCESS( Api.NtCreateThreadEx( &Thd, THREAD_ALL_ACCESS, NULL, Process, Api.RtlExitUserThread, STATUS_ACCESS_DENIED, TRUE, 0, 0x1000 * 4, 0x1000, NULL ) ) ) {
 			/* Queue a call to fill the current address buffer with the specified byte */
 			if ( NT_SUCCESS( Api.NtQueueApcThread( Thd, Api.RtlFillMemory, C_PTR( U_PTR( Address ) + Len ), C_PTR( U_PTR( 1 ) ), C_PTR( U_PTR( Buf[ Len ] ) ) ) ) ) {
 				/* Queue a call to exit the current thread indicating we suceeded! */
@@ -107,22 +107,14 @@ D_SEC( B ) BOOL WriteRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_
 			/* Close! */
 			Api.NtClose( Thd );
 		};
-		/* Did the read succeed? */
+		/* Did we fail? */
 		if ( Cmp != TRUE ) {
 			/* Abort! */
-			Ret = FALSE;
 			break;
-		} else {
-			/* Abort! */
-			Cmp = FALSE;
-			Ret = Len < Length ? FALSE : TRUE;
 		};
 	};
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Tbi, sizeof( Tbi ) );
-
-	/* Status */
-	return Ret;
 };

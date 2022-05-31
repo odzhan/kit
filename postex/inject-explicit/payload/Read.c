@@ -80,7 +80,7 @@ D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 	THREAD_TEB_INFORMATION		Tti;
 	THREAD_BASIC_INFORMATION	Tbi;
 
-	BOOLEAN				Ret = FALSE;
+	BOOLEAN				Ret = TRUE;
 	BOOLEAN				Cmp = FALSE;
 	SIZE_T				Inl = 0;
 	THREAD_STATE			Kts = StateInitialized;
@@ -202,7 +202,6 @@ D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 		} else {
 			/* Reset and restart loop ! */
 			Cmp = FALSE;
-			Ret = Len < Length ? FALSE : TRUE;
 		};
 	};
 
@@ -211,6 +210,5 @@ D_SEC( B ) BOOL ReadRemoteMemory( _In_ HANDLE Process, _In_ PVOID Address, _In_ 
 	RtlSecureZeroMemory( &Tti, sizeof( Tti ) );
 	RtlSecureZeroMemory( &Tbi, sizeof( Tbi ) );
 
-	/* Status */
 	return Ret;
 };
