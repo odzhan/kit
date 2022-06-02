@@ -146,15 +146,15 @@ if __name__ in '__main__':
         # remove trustworthy access
         if not ini_tst:
             logging.info( 'Removing trustworthy database attribute from {}'.format( options.db ) );
-            #sql.sql_query( 'ALTER DATABASE [{}] SET TRUSTWORTHY {}'.format( options.db, ( 'OFF', 'ON' )[ ini_tst ] ) );
+            sql.sql_query( "EXEC (' ALTER DATABASE [{}] SET TRUSTWORTHY {} ') AT [{}]".format( options.db, ( 'OFF', 'ON' )[ ini_tst ], options.link ) );
 
         # remove clr support
         if not ini_clr:
             logging.info( 'Removing clr enabled support from the mssql server.' );
-            #sql.sql_query( 'EXEC sp_configure \'show advanced options\', 1' );
-            #sql.sql_query( 'RECONFIGURE' );
-            #sql.sql_query( 'EXEC sp_configure \'clr enabled\', 0' );
-            #sql.sql_query( 'RECONFIGURE' );
+            sql.sql_query( "EXEC (' EXEC sp_configure ''show advanced options'', 1 ') AT [{}]".format( options.link ) )
+            sql.sql_query( "EXEC (' RECONFIGURE ') AT [{}]".format( options.link ) );
+            sql.sql_query( "EXEC (' EXEC sp_configure ''clr enabled'', 0') AT [{}]".format( options.link ) );
+            sql.sql_query( "EXEC (' RECONFIGURE ') AT [{}]".format( options.link ) );
 
     except Exception as e:
         logging.debug( 'Exception:', exc_info = True )

