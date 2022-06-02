@@ -19,3 +19,5 @@
 #include "Macros.h"
 
 #include "KrbForgeTicket.h"
+#include "BeaconUtil.h"
+#include "Buffer.h"

