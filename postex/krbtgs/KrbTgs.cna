@@ -56,4 +56,11 @@ alias krbtgs {
 	beacon_inline_execute( $1, $object, "KrbTgsGo", $bargs );
 };
 
-beacon_command_register( "krbtgs", "Use: krbtgs [spn]" );
+beacon_command_register( "krbtgs", "Download a kerberos apreq and session key for the curent user.",
+			 "Use: krbtgs [spn]\n".
+			 "\n".
+			 "Performs Kerberos self-delegation to the specified SPN to retrieve a Kerberos apreq\n".
+			 "and session key. The resulting files can be converted into an ccache with the help\n".
+			 "of the extract_tickets.py script in the scripts directory.\n".
+			 "\n".
+			 "If are unsure of what SPN to use, specifiy cifs/ with the computer name of the DC" );
