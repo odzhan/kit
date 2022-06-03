@@ -62,6 +62,11 @@ D_SEC( D ) BOOL WINAPI HeapFree_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Flags,
 				RemoveEntryList( &Heb->HeapList );
 				Heb->Length = 0;
 				Heb->Buffer = NULL;
+
+				/* 'Zero' out the heap allocations */
+				RtlSecureZeroMemory( Heb->Buffer, Heb->Length );
+
+				/* 'Free' the memory / block in the heap allocations */
 				Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Heb );
 			};
 			/* Abort! */
