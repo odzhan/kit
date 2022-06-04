@@ -56,6 +56,10 @@ D_SEC( D ) BOOL WINAPI HeapFree_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Flags,
 
 		/* Is this our buffer address */
 		if ( Heb->Buffer == C_PTR( lpMem ) ) {
+
+			/* Zero the original buffer */
+			RtlSecureZeroMemory( Heb->Buffer, Heb->Length );
+
 			/* Free the original buffer */
 			if ( ( Ret = Api.RtlFreeHeap( ProcessHeap, Flags, Heb->Buffer ) ) != FALSE ) {
 				/* Remove from list */
@@ -63,10 +67,7 @@ D_SEC( D ) BOOL WINAPI HeapFree_Hook( _In_ HANDLE ProcessHeap, _In_ ULONG Flags,
 				Heb->Length = 0;
 				Heb->Buffer = NULL;
 
-				/* 'Zero' out the heap allocations */
-				RtlSecureZeroMemory( Heb->Buffer, Heb->Length );
-
-				/* 'Free' the memory / block in the heap allocations */
+				/* Free the memory / block in the heap tracker */
 				Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Heb );
 			};
 			/* Abort! */
