@@ -88,6 +88,9 @@ VOID KrbListGo( _In_ PVOID Argv, _In_ INT Argc )
 						if ( NT_SUCCESS( Api.LsaCallAuthenticationPackage( Lsa, Kid, Kcr, sizeof( KERB_QUERY_TKT_CACHE_REQUEST ), &Res, &RLn, &Pst ) ) ) {
 							if ( NT_SUCCESS( Pst ) ) {
 								/* Enumerate each individual ticket */
+								for ( INT Idx = 0 ; Idx < Res->CountOfTickets ; ++Idx ) {
+									BeaconPrintf( CALLBACK_OUTPUT, "Ticket ETYPE: 0x%x", Res->Tickets[ Idx ].EncryptionType );
+								};
 							};
 							/* Free the return buffer */
 							Api.LsaFreeReturnBuffer( Res );
