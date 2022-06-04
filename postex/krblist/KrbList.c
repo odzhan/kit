@@ -91,7 +91,7 @@ VOID KrbListGo( _In_ PVOID Argv, _In_ INT Argc )
 								/* Create an output buffer for printing */
 								if ( ( Out = BufferCreate() ) != NULL ) {
 
-									BufferPrintf( Out, "Cached Tickets: {%i}\n", Res->CountOfTickets );
+									BufferPrintf( Out, "Cached Tickets: (%i)\n\n", Res->CountOfTickets );
 
 									/* Enumerate each individual ticket */
 									for ( INT Idx = 0 ; Idx < Res->CountOfTickets ; ++Idx ) {
