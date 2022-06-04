@@ -17,4 +17,6 @@
 #include "Native.h"
 #include "Beacon.h"
 #include "Macros.h"
+
+#include "KrbList.h"
 #include "Buffer.h"
