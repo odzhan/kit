@@ -108,6 +108,16 @@ VOID KrbDumpGo( _In_ PVOID Argv, _In_ INT Argc )
 											if ( NT_SUCCESS( Pst ) ) {
 												/* Create string buffer! */
 												if ( ( Out = BufferCreate() ) != NULL ) {
+
+													/* Filter out any '/' characters */
+													for ( INT Jdx = 0 ; Jdx < ( Res->Tickets[ Idx ].ServerName.Length / 2 ) ; ++Jdx ) {
+														/* Does our buffer contain a / symbol in the server name? */
+														if ( Res->Tickets[ Idx ].ServerName.Buffer[ Jdx ] == L'/' ) {
+															/* Change to a ':' */
+															Res->Tickets[ Idx ].ServerName.Buffer[ Jdx ] = L':';
+														};
+													};
+
 													/* Create output filename */
 													if ( BufferPrintf( Out, 
 															   "%u-%08x-%wZ@%wZ-%wZ.kirbi\0", 
