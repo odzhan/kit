@@ -95,6 +95,7 @@ VOID KrbListGo( _In_ PVOID Argv, _In_ INT Argc )
 
 									/* Enumerate each individual ticket */
 									for ( INT Idx = 0 ; Idx < Res->CountOfTickets ; ++Idx ) {
+										BufferPrintf( Out, "%i>", Idx );
 										BufferPrintf( Out, "	Server Name	: %wZ @ %wZ\n", Res->Tickets[ Idx ].ServerName, Res->Tickets[ Idx ].ServerRealm );
 										BufferPrintf( Out, "	Client Name	: %wZ @ %wZ\n", Res->Tickets[ Idx ].ClientName, Res->Tickets[ Idx ].ClientRealm );
 										BufferPrintf( Out, "	Encryption	: %s\n", KrbUtilEncryptionType( Res->Tickets[ Idx ].EncryptionType ) );
