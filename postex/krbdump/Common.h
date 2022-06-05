@@ -18,5 +18,5 @@
 #include "Beacon.h"
 #include "Macros.h"
 
-#include "KrbUtil.h"
+#include "BeaconUtil.h"
 #include "Buffer.h"
