@@ -31,7 +31,7 @@ typedef struct
  * downloads them to TeamServer.
  *
 !*/
-VOID KrbListGo( _In_ PVOID Argv, _In_ INT Argc )
+VOID KrbDumpGo( _In_ PVOID Argv, _In_ INT Argc )
 {
 	API					Api;
 	ANSI_STRING				Ani;
