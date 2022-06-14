@@ -24,5 +24,4 @@
 #include "Pcr.h"
 #include "Pe.h"
 
-#include "InstrumentationCallback.h"
 #include "ProcessNotifyRoutine.h"
