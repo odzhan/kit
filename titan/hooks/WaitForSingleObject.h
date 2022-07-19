@@ -4,7 +4,7 @@
  *
  * GuidePoint Security LLC
  *
- * Threat and Attack SimulatioN
+ * Threat and Attack Simulation
  *
 **/
 
@@ -14,8 +14,7 @@
  *
  * Purpose:
  *
- * Awaits an object to be signaled before returning
- * a result.
+ * Obfuscates Beacon when it calls WaitForSingleObject
  *
 !*/
-D_SEC( D ) DWORD WINAPI WaitForSingleObject_Hook( _In_ HANDLE Handle, _In_ DWORD Timeout );
+D_SEC( D ) DWORD WINAPI WaitForSingleObject_Hook( _In_ HANDLE hHandle, _In_ DWORD Milliseconds );

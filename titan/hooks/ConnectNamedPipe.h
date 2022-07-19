@@ -4,7 +4,7 @@
  *
  * GuidePoint Security LLC
  *
- * Threat and Attack SimulatioN
+ * Threat and Attack Simulation
  *
 **/
 
@@ -14,9 +14,7 @@
  *
  * Purpose:
  *
- * Awaits for a connection for a SMB Beacon, and
- * creates a ROP chain to hide itself from any
- * memory scans.
+ * Obfuscates Beacon when it calls WaitForSingleObject
  *
 !*/
-D_SEC( D ) BOOL WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _Inout_ LPOVERLAPPED lpOverlapped );
+D_SEC( D ) BOOLEAN WINAPI ConnectNamedPipe_Hook( _In_ HANDLE hNamedPipe, _In_ LPOVERLAPPED lpOverlapped );
