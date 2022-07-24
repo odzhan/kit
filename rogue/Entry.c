@@ -172,7 +172,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 				};
 				if ( Ctx->Established != FALSE ) {
 					if ( Ctx->SleepTime != 0 ) {
-						SleepObfuscate( Ctx->SleepTime );
+						//SleepObfuscate( Ctx->SleepTime );
 					};
 				};
 			};
