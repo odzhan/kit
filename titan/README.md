@@ -1,6 +1,6 @@
 # About
 
-TITAN is a reflective loader intended to hide the traces of Cobalt Strike in memory. It is not intended to hide from analysts or from any defenders, but may succeed at doing so regardless. When using TITAN, if you export or use a DNS Beacon, the Beacon will instead use `DNS over HTTP(s)` protocol to communicate back to the Teamserver. I recommend only using this option for a low & slow backup communication.
+TITAN is a reflective loader intended to hide the traces of Cobalt Strike in memory. It is not intended to hide from analysts or from any defenders, but may succeed at doing so regardless. When using TITAN, if you export or use a DNS Beacon, the Beacon will instead use `DNS over HTTP(s)` protocol to communicate back to the Teamserver. I recommend only using this option for a low & slow backup communication. If you want to ensure your initial access isnt deleted from memory at the start of an engagement, I recommend using this toolset to your advantage.
 
 ## Caveats
 
