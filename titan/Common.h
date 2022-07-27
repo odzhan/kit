@@ -33,16 +33,14 @@
 #include "Hash.h"
 #include "Heap.h"
 #include "Peb.h"
+#include "Hde.h"
 #include "Ldr.h"
-#include "Obf.h"
 #include "Pe.h"
 
 /* Include Hooks! */
-#include "hooks/WaitForSingleObject.h"
 #include "hooks/NtMapViewOfSection.h"
 #include "hooks/WriteProcessMemory.h"
 #include "hooks/ReadProcessMemory.h"
-#include "hooks/ConnectNamedPipe.h"
 #include "hooks/VirtualProtectEx.h"
 #include "hooks/NtQueueApcThread.h"
 #include "hooks/SetThreadContext.h"
@@ -54,4 +52,3 @@
 #include "hooks/ExitThread.h"
 #include "hooks/HeapAlloc.h"
 #include "hooks/HeapFree.h"
-#include "hooks/Sleep.h"
