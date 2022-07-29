@@ -7,7 +7,6 @@ SECTIONS
 		*( .text$C )
 		*( .text$D )
 		*( .text$E )
-		*( .data*  )
 		*( .rdata* )
 		*( .text$F )
 	}

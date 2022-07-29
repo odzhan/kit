@@ -17,8 +17,8 @@ all:
 	@ nasm -f win64 asm/x64/Start.asm -o Start.x64.o
 	@ nasm -f win32 asm/x86/GetIp.asm -o GetIp.x86.o
 	@ nasm -f win64 asm/x64/GetIp.asm -o GetIp.x64.o
-	@ $(CC_X86) *.c Start.x86.o GetIp.x86.o hooks/*.c hde/*32*.c -o $(OUTX86) $(CFLAGS) $(LFLAGS) -I.
-	@ $(CC_X64) *.c Start.x64.o GetIp.x64.o hooks/*.c hde/*64*.c -o $(OUTX64) $(CFLAGS) $(LFLAGS) -I.
+	@ $(CC_X86) *.c Start.x86.o GetIp.x86.o hooks/*.c -o $(OUTX86) $(CFLAGS) $(LFLAGS) -I.
+	@ $(CC_X64) *.c Start.x64.o GetIp.x64.o hooks/*.c -o $(OUTX64) $(CFLAGS) $(LFLAGS) -I.
 	@ python3 python3/extract.py -f $(OUTX86) -o $(BINX86)
 	@ python3 python3/extract.py -f $(OUTX64) -o $(BINX64)
 

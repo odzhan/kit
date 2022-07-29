@@ -33,7 +33,6 @@
 #include "Hash.h"
 #include "Heap.h"
 #include "Peb.h"
-#include "Hde.h"
 #include "Ldr.h"
 #include "Pe.h"
 
@@ -52,3 +51,4 @@
 #include "hooks/ExitThread.h"
 #include "hooks/HeapAlloc.h"
 #include "hooks/HeapFree.h"
+#include "hooks/Sleep.h"
