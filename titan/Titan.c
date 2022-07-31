@@ -151,6 +151,9 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 				Tbl->Table->RxLength       = U_PTR( SLn );
 				Tbl->Table->ImageLength    = U_PTR( MLn );
 
+				/* Copy over the CLIENT_ID structure */
+				__builtin_memcpy( &Tbl->Table->ClientId, &NtCurrentTeb()->ClientId, sizeof( CLIENT_ID ) );
+
 				/* Initiliaze heap list header */
 				InitializeListHead( &Tbl->Table->HeapList );
 

