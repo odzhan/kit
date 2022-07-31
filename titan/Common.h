@@ -18,6 +18,7 @@
 #include <wtypes.h>
 #include <ntstatus.h>
 #include <winioctl.h>
+#include <intrin.h>
 #include "Native.h"
 #include "Macros.h"
 #include "Config.h"
