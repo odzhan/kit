@@ -1,16 +1,46 @@
-# About
+# About 
 
-TITAN is a reflective loader intended to hide the traces of Cobalt Strike in memory. It is not intended to hide from analysts or from any defenders, but may succeed at doing so regardless. When using TITAN, if you export or use a DNS Beacon, the Beacon will instead use `DNS over HTTP(s)` protocol to communicate back to the Teamserver. I recommend only using this option for a low & slow backup communication. If you want to ensure your initial access isnt deleted from memory at the start of an engagement, I recommend using this toolset to your advantage.
+Titan is a User Defined Reflective DLL ( URDLL ) that uses a combination of techniques to achieve initial execution and maintain shell stability for Cobalt Strike in a modern endpoint-deteciton and response heavy environment. Titan was designed to operate against CrowdStrike, SentinelOne, and Cylance environments without being flagged as malware, when combined with unique initial access options. 
 
-## Caveats
+Titan is designed to work specifically with Cobalt Strike and with Cobalt Strike alone. It could be ported to other frameworks, but likely is pointless in doing so.
 
-Unfortunately, the 'stock' artifact kit for Cobalt Strike ( the one that allows you to export EXE/DLL/SERVICES ) files do not support Titan, as the stock size is too small. I recommend you download the artifact kit and upgrade the size to hold the complete size, as the stock one will not work and cause crashes. 
+## Table of Contents
 
-You can only export a working `RAW` format or `Powershell` formats, as the EXE/DLL templates in Cobalt don't work unless you compile new ones with a larger size, or until I have the time to fix it myself.
+ - [Techniques](#Techniques)
+ - [Setup](#Setup)
+ - [Initial Access Sample](#Initial-Access-Example-With-Shelter)
 
-You must set the `sleep_mask` setting in your profile to `FALSE` as the built-in hook currently obfuscates beacon, and will break the sleep masking feature. An example profile has been commited under [profile/Titan.cna](profile/Titan.cna)
+## Techniques
 
-Additionally, anything that uses Powershell or spawns a new thread in Beacon will be blocked, as I do not  yet have a way of tracking the secondary thread / obfuscating it. This is on my list of improvements to make.
+### Memory Evasion: Obfuscate and Sleep
+
+Titan implements a basic x86_64 memory evasion hook that hides the traces of its implant in memory with the help user-created timer callbacks, a technique popularized by NightHawk and implemented publicly by the user [Paul](https://twitter.com/c5pider) whom published the project under the name [Ekko](https://github.com/Cracked5pider/Ekko). However, both implementation have a few caveats and race conditions that lead to it being unstable.
+
+The latest version supports multiple sessions being spawned within the same process due to the creation of a new thread pool for each Beacon. It no longer breaks the host process's original queue if it is using one.
+
+As of the latest commit, it does not support stack spoofing, but will in the near future. I'm in the progress of developing the solution.
+
+Furthermore, this is a temporary hook. I will be replacing it with another implementation for x86 / x64 that will solve alot of the detections that Patriot, and potentially Moneta / Pe-Seive will end up implementing in the near future.
+
+### DNS: Now with DNS over HTTP(s)!
+
+DNS beacons recieved a completed overhall that allowed them to send their traffic over a more secure DNS over HTTP(s) provider that is hardcoded within the hook code itself. Each and every request will be seen sent to those providers, masking the original DNS name with ease. If you wish that your traffic be sent over the original DNS protocol, then you can disable this hook.
+
+### Injection: Return Oriented Write
+ 
+Titan adds a new way to achieve write, replacing WriteProcessMemory and slowing down the writes, leading to less chances of being detected due to the timing of events. It supports migration from the following architectures.
+
+| Architecture | x64 -> x64 | x64 -> x86 | x86 -> x64 | x86 -> x86 |
+|--------------|------------|------------|------------|------------|
+| x64          | TRUE       | FALSE      | FALSE      | FALSE      |
+| x86          | FALSE      | FALSE      | TRUE       | TRUE       |
+
+**THIS FEATURE IS STILL NOT IMPLEMENTED BUT WILL BE IN THE NEAR FUTURE**
+
+### Single Thread
+
+Cobalt is largely single threaded on its own, but Titan forces it to be entirely single threaded. Unfortunately, this breaks some of the internal functionality such as Powershell-based commands 
+at the cost of operational security. Largely, this should not break a majority of the functionality you're using, but will break some.
 
 ## Setup
 
@@ -30,7 +60,7 @@ Success! You've successfully compiled the binary files needed to utilize it. To 
 
 ![](https://i.imgur.com/sI5Quif.png)
 
-## Shellter Example
+## Initial Access Example With Shelter
 
 An example scenario is laid out below: you have some kind of access to the target machine, where you can run arbitrary executables, or download arbitrary files to run. With physical access to the target machine, we can begin attempting to gain physical access through a combination of TITAN and SHELTER.
 
