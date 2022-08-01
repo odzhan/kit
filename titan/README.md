@@ -7,6 +7,11 @@ Titan is designed to work specifically with Cobalt Strike and with Cobalt Strike
 ## Table of Contents
 
  - [Techniques](#Techniques)
+     - [Memory Evasion](#Memory-Evasion-Obfuscate-and-Sleep)
+     - [DNS over HTTP(s)](#DNS-Now-with-DNS-over-HTTPs)
+     - [Injection](#Injection-Return-Oriented-Write)
+     - [Single Threaded](#Single-Thread)
+     - [System Calls!](#Redirect-To-System-Calls)
  - [Setup](#Setup)
  - [Initial Access Sample](#Initial-Access-Example-With-Shelter)
 
@@ -41,6 +46,10 @@ Titan adds a new way to achieve write, replacing WriteProcessMemory and slowing 
 
 Cobalt is largely single threaded on its own, but Titan forces it to be entirely single threaded. Unfortunately, this breaks some of the internal functionality such as Powershell-based commands 
 at the cost of operational security. Largely, this should not break a majority of the functionality you're using, but will break some.
+
+### Redirect To System Calls
+
+Some functions that involve remote process interaction are redirected to System Calls using a mapping of KnownDLLs for x86/x64/WOW64. It avoids some detections that SentinelOne/CrowdStrike implement with their inline hooks.
 
 ## Setup
 
