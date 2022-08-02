@@ -10,7 +10,7 @@
 ;;
 ;; Export
 ;;
-EXTERN	Payload64
+GLOBAL	Payload64
 
 [SECTION .text]
 

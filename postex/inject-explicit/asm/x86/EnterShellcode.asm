@@ -10,9 +10,9 @@
 ;;
 ;; Export
 ;;
-EXTERN	_EnterShellcode64
-EXTERN	_Payload64
-EXTERN	_Payload32
+GLOBAL	_EnterShellcode64
+GLOBAL	_Payload64
+GLOBAL	_Payload32
 
 [SECTION .text]
 
