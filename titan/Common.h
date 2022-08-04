@@ -35,6 +35,7 @@
 #include "Heap.h"
 #include "Peb.h"
 #include "Ldr.h"
+#include "Hde.h"
 #include "Pe.h"
 
 /* Include Hooks! */
