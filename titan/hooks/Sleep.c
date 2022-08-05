@@ -138,7 +138,7 @@ typedef struct
  * stack pointer.
  *
 !*/
-D_SEC( D ) BOOLEAN GetThreadInfoBlockFromStack( _In_ PVOID Address, _Out_ PNT_TIB InfoBlock )
+static D_SEC( D ) BOOLEAN GetThreadInfoBlockFromStack( _In_ PVOID Address, _Out_ PNT_TIB InfoBlock )
 {
 	API				Api;
 	NT_TIB				Tib;
@@ -257,7 +257,7 @@ D_SEC( D ) BOOLEAN GetThreadInfoBlockFromStack( _In_ PVOID Address, _Out_ PNT_TI
  * from Patriot.
  *
 !*/
-D_SEC( D ) PVOID GetJmpRaxTarget( VOID )
+static D_SEC( D ) PVOID GetJmpRaxTarget( VOID )
 {
 	HDE			Hde;
 
@@ -334,7 +334,7 @@ D_SEC( D ) PVOID GetJmpRaxTarget( VOID )
  * Uses DR3 to trigger the breakpoint without issue.
  *
 !*/
-D_SEC( D ) VOID EnableBreakpoint( _In_ PVOID Addr )
+static D_SEC( D ) VOID EnableBreakpoint( _In_ PVOID Addr )
 {
 	API		Api;
 	CONTEXT		Ctx;
@@ -382,7 +382,7 @@ D_SEC( D ) VOID EnableBreakpoint( _In_ PVOID Addr )
  *
 !*/
 
-D_SEC( D ) VOID RemoveBreakpoint( _In_ PVOID Addr )
+static D_SEC( D ) VOID RemoveBreakpoint( _In_ PVOID Addr )
 {
 	API		Api;
 	CONTEXT		Ctx;
@@ -425,7 +425,7 @@ D_SEC( D ) VOID RemoveBreakpoint( _In_ PVOID Addr )
  * with a VEH debugger.
  *
 !*/
-D_SEC( D ) NTSTATUS NTAPI TpAllocTimerHook( _Out_ PTP_TIMER *Timer, _In_ PTP_TIMER_CALLBACK Callback, _Inout_opt_ PVOID Context, _In_opt_ PTP_CALLBACK_ENVIRON CallbackEnviron ) 
+static D_SEC( D ) NTSTATUS NTAPI TpAllocTimerHook( _Out_ PTP_TIMER *Timer, _In_ PTP_TIMER_CALLBACK Callback, _Inout_opt_ PVOID Context, _In_opt_ PTP_CALLBACK_ENVIRON CallbackEnviron ) 
 {
 	PTABLE		Tbl = NULL;
 	NTSTATUS 	Ret = STATUS_SUCCESS;
@@ -458,7 +458,7 @@ D_SEC( D ) NTSTATUS NTAPI TpAllocTimerHook( _Out_ PTP_TIMER *Timer, _In_ PTP_TIM
  * our custom thread pool.
  *
 !*/
-D_SEC( D ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf )
+static D_SEC( D ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf )
 {
 	DWORD	Ret = 0;
 	PTABLE	Tbl = NULL;
@@ -493,7 +493,7 @@ D_SEC( D ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf )
  * invalid target.
  *
 !*/
-D_SEC( D ) VOID CfgEnableFunc( _In_ PVOID ImageBase, _In_ PVOID Function )
+static D_SEC( D ) VOID CfgEnableFunc( _In_ PVOID ImageBase, _In_ PVOID Function )
 {
 	API			Api;
 	CFG_CALL_TARGET_INFO	Cfg;
