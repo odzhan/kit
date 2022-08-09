@@ -1,0 +1,6 @@
+[submodule "third-party/cobalt-arsenal"]
+	path = third-party/cobalt-arsenal
+	url = https://github.com/mgeeky/cobalt-arsenal
+[submodule "third-party/AggressorScripts"]
+	path = third-party/AggressorScripts
+	url = https://github.com/harleyQu1nn/AggressorScripts
