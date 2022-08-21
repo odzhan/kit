@@ -27,8 +27,7 @@ int main( int argc, char **argv ) {
 	RtlSecureZeroMemory( &Wsd, sizeof( Wsd ) );
 
 	if ( ! WSAStartup( MAKEWORD( 2, 2 ), &Wsd ) ) {
-		SshocksInit();
-
+		TunnelInit( );
 		WSACleanup( );
 	};
 

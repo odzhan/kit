@@ -14,5 +14,5 @@
 #include <windows.h>
 #include <libssh2.h>
 #include <stdio.h>
-#include "Sshocks.h"
+#include "Tunnel.h"
 #include "Macros.h"
