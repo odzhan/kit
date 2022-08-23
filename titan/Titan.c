@@ -121,7 +121,7 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x4b184b05, PTR_TO_HOOK( Mem, HeapFree_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xadc4062e, PTR_TO_HOOK( Mem, HeapAlloc_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xc165d757, PTR_TO_HOOK( Mem, ExitThread_Hook ) );
-				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x8641aec0, PTR_TO_HOOK( Mem, DnsQuery_A_Hook ) );
+				//LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x8641aec0, PTR_TO_HOOK( Mem, DnsQuery_A_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x3a5fb425, PTR_TO_HOOK( Mem, HeapReAlloc_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x98baab11, PTR_TO_HOOK( Mem, CreateThread_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xdecfc1bf, PTR_TO_HOOK( Mem, GetProcAddress_Hook ) );

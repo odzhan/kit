@@ -36,6 +36,7 @@
 #include "Peb.h"
 #include "Ldr.h"
 #include "Hde.h"
+#include "Obf.h"
 #include "Pe.h"
 
 /* Include Hooks! */
