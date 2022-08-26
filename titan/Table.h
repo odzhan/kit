@@ -24,6 +24,7 @@ typedef struct __attribute__(( packed ))
 	ULONG_PTR 	ImageLength;
 
 	LIST_ENTRY	HeapList;
+	LIST_ENTRY	PipeList;
 	TABLE_DEBUGGER	Debugger;
 } TABLE_HEAP, *PTABLE_HEAP ;
 
