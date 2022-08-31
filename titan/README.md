@@ -25,6 +25,13 @@ The latest version supports multiple sessions being spawned within the same proc
 
 It currently encryptes when Beacon waits for jobs to complete, while it is sleeping, and while SMB pipes are awaiting a connection, writing to a pipe, or reading from a named pipe to avoid detection when transfering data over the network.
 
+| Beacon                | Obfuscated In Memory |
+|-----------------------|----------------------|
+| windows/reverse_https | TRUE                 |
+| windows/reverse_dns   | TRUE                 |
+| windows/smb           | TRUE                 |
+| windows/tcp           | FALSE                |
+
 ### DNS: Now with DNS over HTTP(s)!
 
 DNS beacons recieved a completed overhall that allowed them to send their traffic over a more secure DNS over HTTP(s) provider that is hardcoded within the hook code itself. Each and every request will be seen sent to those providers, masking the original DNS name with ease. If you wish that your traffic be sent over the original DNS protocol, then you can disable this hook.
