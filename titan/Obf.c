@@ -421,16 +421,10 @@ static D_SEC( E ) VOID EnableBreakpoint( _In_ PVOID Addr )
 	/* Set DR3 to the specified address */
 	Ctx.Dr3 = U_PTR( Addr );
 
-	/* Sets DR0-DR3 for HWBP */
-	Msk = ( 1UL << 16 ) - 1UL;
-	Bit = ( Ctx.Dr7 &~ ( Msk << 16 ) ) | ( 0 << 16 );
-	Ctx.Dr7 = U_PTR( Bit );
-
-	/* Sets DR3 as enabled */
-	Msk = ( 1UL << 1 ) - 1UL;
-	Bit = ( Ctx.Dr7 &~ ( Msk << 6 ) ) | ( 1 << 6 );
-	Ctx.Dr7 = U_PTR( Bit );
-	Ctx.Dr6 = U_PTR( 0 );
+	/* Set DR7 */
+	Ctx.Dr7 &= ~( 3ULL << ( 16 + 4 * 3 ) );
+	Ctx.Dr7 &= ~( 3ULL << ( 18 + 4 * 3 ) );
+	Ctx.Dr7 |= 1ULL << ( 2 * 3 );
 
 	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 	Api.NtSetContextThread( NtCurrentThread(), &Ctx );
@@ -466,14 +460,9 @@ static D_SEC( E ) VOID RemoveBreakpoint( _In_ PVOID Addr )
 	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 	Api.NtGetContextThread( NtCurrentThread(), &Ctx );
 
-	/* Disables the DR3 local mode! */
-	Msk = ( 1ULL << 1 ) - 1UL;
-	Bit = ( Ctx.Dr7 &~ ( Msk << 6 ) ) | ( 0 << 6 );
-	Ctx.Dr7 = U_PTR( Bit );
-	Ctx.Dr6 = U_PTR( 0 );
-	Ctx.Dr3 = U_PTR( 0 );
-	Ctx.Dr7 = U_PTR( 0 );
-	Ctx.EFlags = Ctx.EFlags &~ 0x100;
+	/* Set DR7 */
+	Ctx.Dr3  = 0;
+	Ctx.Dr7 &= ~( 1ULL << ( 2 * 3 ) ); 
 
 	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 	Api.NtSetContextThread( NtCurrentThread(), &Ctx );
