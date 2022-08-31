@@ -60,6 +60,21 @@ Some functions that involve remote process interaction are redirected to System 
 
 To start utilizing Titan, you will need to install `nasm`, `make`, `python3`, the [pefile module for python](https://github.com/erocarrera/pefile) and Mingw-w64. You will need the mingw-w64 compilers from musl.cc, which is available here for [x86_64-w64-mingw32-cross](https://musl.cc/x86_64-w64-mingw32-cross.tgz), and [i686-w64-mingw32-cross](https://musl.cc/i686-w64-mingw32-cross.tgz) to compile the code, as the ones available in your package managers is not updated to the latest versions. Once you've setup your compilers in the PATH, and installed the above packages, you can start compiling the source code!
 
+Example steps to download the cross-compilers and add them to your PATH:
+
+```
+# cd /root/tools
+# wget https://musl.cc/x86_64-w64-mingw32-cross.tgz
+# tar -xvf x86_64-w64-mingw32-cross.tgz
+# cd x86_64-w64-mingw32-cross/bin
+# export PATH=$(pwd):$PATH
+# cd /root/tools
+# wget https://musl.cc/i686-w64-mingw32-cross.tgz
+# tar -xvzf i686-w64-mingw32-cross.tgz
+# cd i686-w64-mingw32-cross/bin
+# export PATH=$(pwd):$PATH
+```
+
 A sample output is shown below
 
  ```shell=/bin/bash
