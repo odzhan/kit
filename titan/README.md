@@ -23,9 +23,7 @@ Titan implements a basic x86_64 memory evasion hook that hides the traces of its
 
 The latest version supports multiple sessions being spawned within the same process due to the creation of a new thread pool for each Beacon. It no longer breaks the host process's original queue if it is using one.
 
-As of the latest commit, it does not support stack spoofing, but will in the near future. I'm in the progress of developing the solution.
-
-Furthermore, this is a temporary hook. I will be replacing it with another implementation for x86 / x64 that will solve alot of the detections that Patriot, and potentially Moneta / Pe-Seive will end up implementing in the near future.
+It currently encryptes when Beacon waits for jobs to complete, while it is sleeping, and while SMB pipes are awaiting a connection, writing to a pipe, or reading from a named pipe to avoid detection when transfering data over the network.
 
 ### DNS: Now with DNS over HTTP(s)!
 
