@@ -588,6 +588,9 @@ static D_SEC( E ) NTSTATUS NTAPI RtlRegisterWaitWrap(
 		if ( NT_SUCCESS( EnableBreakpoint( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) ) ) {
 			/* Call the API, which will then 'hooked' */
 			Nst = Api.RtlRegisterWait( NewWaitObject, Object, Callback, Context, Milliseconds, Flags );
+
+			/* 'Remove' the breakpoint */
+			RemoveBreakpoint( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) );
 		};
 		/* Remove the VEH handler */
 		Api.RtlRemoveVectoredExceptionHandler( Veh );
