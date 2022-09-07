@@ -14,6 +14,7 @@ typedef struct
 {
 	D_API( NtSetContextThread );
 	D_API( NtGetContextThread );
+	D_API( LdrLoadDll );
 } API ;
 
 /* API Hashes */
@@ -81,7 +82,36 @@ static D_SEC( D ) VOID EnableHeapHook( VOID )
 !*/
 static D_SEC( D ) VOID RemoveHeapHook( VOID )
 {
+	API	Api;
+	CONTEXT	Ctx;
 
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
+
+	Api.NtSetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTSETCONTEXTTHREAD );
+	Api.NtGetContextThread = PeGetFuncEat( PebGetModule( H_LIB_NTDLL ), H_API_NTGETCONTEXTTHREAD );
+
+	Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+
+	if ( NT_SUCCESS( Api.NtGetContextThread( NtCurrentThread(), &Ctx ) ) ) {
+		/* Clear hooks */
+		Ctx.Dr2 = 0;
+		Ctx.Dr3 = 0;
+
+		/* Remove breaks */
+		Ctx.Dr7 &= ~( 1ULL << ( 2 * 2 ) );
+		Ctx.Dr7 &= ~( 1ULL << ( 2 * 3 ) );
+
+		Ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+
+		if ( NT_SUCCESS( Api.NtSetContextThread( NtCurrentThread(), &Ctx ) ) ) {
+		};
+	};
+
+	/* Zero out stack structures */
+	RtlSecureZeroMemory( &Api, sizeof( Api ) );
+	RtlSecureZeroMemory( &Ctx, sizeof( Ctx ) );
 };
 
 /*!
@@ -95,7 +125,19 @@ static D_SEC( D ) VOID RemoveHeapHook( VOID )
 !*/
 static D_SEC( D ) PVOID WINAPI RtlAllocateHeapHook( _In_ HANDLE ProcessHeap, _In_ ULONG Flags, _In_ SIZE_T Length )
 {
+	PVOID	Ptr = NULL;
 
+	/* Remove heap breakpoints */
+	RemoveHeapHook( );
+
+	/* Execute the call */
+	Ptr = HeapAlloc_Hook( ProcessHeap, Flags, Length );
+
+	/* Enable heap breakpoints */
+	EnableHeapHook( );
+
+	/* Return */
+	return Ptr;
 };
 
 /*!
@@ -109,7 +151,19 @@ static D_SEC( D ) PVOID WINAPI RtlAllocateHeapHook( _In_ HANDLE ProcessHeap, _In
 !*/
 static D_SEC( D ) BOOL WINAPI RtlFreeHeapHook( _In_ HANDLE ProcessHeap, _In_ ULONG Flags, _In_ PVOID lpMem )
 {
+	BOOL	Ret = FALSE;
 
+	/* Remove heap breakpoitns */
+	RemoveHeapHook( );
+
+	/* Execute the call */
+	Ret = HeapFree_Hook( ProcessHeap, Flags, lpMem );
+
+	/* Enable heap breakpoints */
+	EnableHeapHook( );
+
+	/* Return */
+	return Ret;
 };
 
 /*!
@@ -117,9 +171,8 @@ static D_SEC( D ) BOOL WINAPI RtlFreeHeapHook( _In_ HANDLE ProcessHeap, _In_ ULO
  * Purpose:
  *
  * VEH debugger that forces calls to RtlAllocateHeap,
- * RtlFreeHeap, and RtlReAllocateHeap to be hooked 
- * and tracked when executed by the underlying HTTP
- * functions.
+ * and RtlFreeHeap to be redirected to hooks that 
+ * will track the allocation and free it.
  *
 !*/
 static D_SEC( D ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf )
