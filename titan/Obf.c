@@ -529,7 +529,7 @@ static D_SEC( E ) NTSTATUS NTAPI TpAllocWaitHook( _Out_ PTP_WAIT **Out, _In_ PTP
 !*/
 static D_SEC( E ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf )
 {
-	DWORD	Ret = 0;
+	DWORD	Ret = EXCEPTION_CONTINUE_SEARCH;
 	PTABLE	Tbl = NULL;
 
 	Tbl = C_PTR( G_SYM( Table ) );
@@ -544,13 +544,10 @@ static D_SEC( E ) LONG WINAPI VehDebugger( _In_ PEXCEPTION_POINTERS ExceptionIf 
 			/* Notify! */
 			Ret = EXCEPTION_CONTINUE_EXECUTION;
 		};
-
-		/* Return */
-		return Ret;
 	};
 
-	/* Pretty much ignore all other exceptions! */
-	return EXCEPTION_CONTINUE_SEARCH;
+	/* Return */
+	return Ret;
 };
 
 /*!
