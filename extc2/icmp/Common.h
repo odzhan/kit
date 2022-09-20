@@ -16,6 +16,7 @@
 #include "Macros.h"
 #include "Labels.h"
 #include "Native.h"
+#include "IcmpNt.h"
 #include "Hash.h"
 #include "Peb.h"
 #include "Pe.h"
