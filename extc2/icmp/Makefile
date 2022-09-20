@@ -5,6 +5,7 @@ CFLAGS	:= $(CFLAGS) -Os -fno-asynchronous-unwind-tables -nostdlib
 CFLAGS 	:= $(CFLAGS) -fno-ident -fpack-struct=8 -falign-functions=1
 CFLAGS  := $(CFLAGS) -s -ffunction-sections -falign-jumps=1 -w
 CFLAGS	:= $(CFLAGS) -falign-labels=1 -fPIC -Wl,-TSectionLink.ld
+CFLAGS	:= $(CFLAGS) -fzero-call-used-regs=used-gpr 
 LFLAGS	:= $(LFLAGS) -Wl,-s,--no-seh,--enable-stdcall-fixup
 
 OUTX64	:= extc2-icmp.x64.exe
